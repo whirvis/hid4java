@@ -1,7 +1,7 @@
 /*
- * The MIT License (MIT)
+ * the MIT License (MIT)
  *
- * Copyright (c) 2014-2016 Gary Rowe
+ * Copyright (c) 2014-2025 Gary Rowe, "Whirvis" Trent Summerlin
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -10,7 +10,7 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
+ * the above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -20,36 +20,37 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
  */
-
 package org.hid4java;
 
 /**
- * Provide a collection of different device enumeration scanning modes so that
- * device attach/detach events can be generated.
+ * Determines how HID devices will be scanned.
+ *
+ * @see HidServicesSpecification#setScanMode(ScanMode)
  */
 public enum ScanMode {
 
-  /**
-   * Equivalent to scan interval of zero.
-   */
-  NO_SCAN,
-  /**
-   * Trigger continuous scan at given interval.
-   */
-  SCAN_AT_FIXED_INTERVAL,
-  /**
-   * Trigger continuous scan at given interval but introduce a pause after a write
-   * operation to allow the device time to process data without having to respond
-   * to further enumeration requests.
-   *
-   * This can be a useful strategy for handling devices with constrained processing
-   * power and/or limited USB stacks.
-   *
-   * Note this will affect the time to generate a device attach/detach event since
-   * scanning will be paused.
-   */
-  SCAN_AT_FIXED_INTERVAL_WITH_PAUSE_AFTER_WRITE,
+    /**
+     * Equivalent to a scan interval of zero.
+     */
+    NO_SCAN,
+
+    /**
+     * Trigger continuous scan at a given interval.
+     */
+    SCAN_AT_FIXED_INTERVAL,
+
+    /**
+     * Trigger continuous scan at a given interval; but pause after each
+     * write operation to give the device time to process data (so it does
+     * not need to respond to further enumeration requests).
+     * <p>
+     * This can be a useful strategy for handling devices with constrained
+     * processing power and/or limited USB stacks.
+     * <p>
+     * <b>Note:</b> This will affect the time to generate a device attach
+     * or detach event, since scanning will be paused.
+     */
+    SCAN_AT_FIXED_INTERVAL_WITH_PAUSE_AFTER_WRITE,
 
 }
