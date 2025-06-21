@@ -173,6 +173,13 @@
       <version>[5.8.0,)</version>
     </dependency>
 
+    <!-- JetBrains annotations -->
+    <dependency>
+      <groupId>org.jetbrains</groupId>
+      <artifactId>annotations</artifactId>
+      <version>26.0.2</version>
+    </dependency>
+
     <!-- JUnit -->
     <dependency>
       <groupId>org.junit.jupiter</groupId>
