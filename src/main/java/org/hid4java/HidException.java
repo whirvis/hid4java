@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2014-2015 Gary Rowe
+ * Copyright (c) 2014-2025 Gary Rowe, "Whirvis" Trent Summerlin
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,26 +20,73 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
  */
-
 package org.hid4java;
 
+import org.jetbrains.annotations.Nullable;
+
 /**
- * Caught exception to provide the following to API consumers:
- * <ul>
- * <li>Notification of a serious problem with HID</li>
- * </ul>
+ * An uncaught exception that indicates a serious problem with the
+ * HID API has occurred.
  *
  * @since 0.0.1
  */
 public class HidException extends RuntimeException {
 
-  public HidException(String message) {
-    super(message);
-  }
+    /**
+     * Constructs a new {@code HidException} with {@code null} as its
+     * detail message. The cause is not initialized, and may subsequently
+     * be initialized by a call to {@link #initCause(Throwable)}.
+     */
+    public HidException() {
+        super();
+    }
 
-  public HidException(String message, Throwable cause) {
-    super(message, cause);
-  }
+    /**
+     * Constructs a new {@code HidException} with the specified detail
+     * message. The cause is not initialized, and may subsequently be
+     * initialized by a call to {@link #initCause}.
+     *
+     * @param message The detail message (which is saved for later retrieval
+     *                by the {@link #getMessage()} method).
+     */
+    public HidException(@Nullable String message) {
+        super(message);
+    }
+
+    /**
+     * Constructs a new {@code HidException} with the specified cause and
+     * a detail message of {@code (cause == null ? null : cause.toString())}
+     * (which typically contains the class and the cause's detail message).
+     *
+     * @param cause The cause (which is saved for later retrieval by the
+     *              {@link #getCause()} method). A value of {@code null} is
+     *              permitted, and indicates that the cause is non-existent
+     *              or unknown.
+     */
+    public HidException(@Nullable Throwable cause) {
+        super(cause);
+    }
+
+    /**
+     * Constructs a new {@code HidException} with the specified detail
+     * message and cause.
+     * <p>
+     * <b>Note: The detail message associated with {@code cause} is
+     * <i>not</i> automatically incorporated in this exception's detail
+     * message.
+     *
+     * @param message The detail message (which is saved for later retrieval
+     *                by the {@link #getMessage()} method).
+     * @param cause   The cause (which is saved for later retrieval by the
+     *                {@link #getCause()} method). A value of {@code null} is
+     *                permitted, and indicates that the cause is non-existent
+     *                or unknown.
+     */
+    public HidException(
+            @Nullable String message,
+            @Nullable Throwable cause) {
+        super(message, cause);
+    }
+
 }
