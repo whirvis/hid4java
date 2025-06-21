@@ -296,8 +296,8 @@ class HidDeviceManager {
 
   private synchronized Runnable getScanRunnable() {
 
-    final int scanInterval = hidServicesSpecification.getScanInterval();
-    final int pauseInterval = hidServicesSpecification.getPauseInterval();
+    final long scanInterval = hidServicesSpecification.getScanIntervalMs();
+    final long pauseInterval = hidServicesSpecification.getPauseIntervalMs();
 
     switch (hidServicesSpecification.getScanMode()) {
       case NO_SCAN:
