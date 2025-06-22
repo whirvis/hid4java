@@ -116,7 +116,7 @@ public class HidApi {
   public static void init() {
 
     if (useLibUsbVariant && Platform.isLinux()) {
-      hidApiLibrary = LibusbHidApiLibrary.INSTANCE;
+      hidApiLibrary = LibUsbHidApiLibrary.INSTANCE;
     } else if (Platform.isMac()) {
       hidApiLibrary = DarwinHidApiLibrary.INSTANCE;
     } else {

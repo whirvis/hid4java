@@ -31,9 +31,9 @@ import com.sun.jna.Native;
  *
  * @since 0.7.0
  */
-public interface LibusbHidApiLibrary extends HidRawHidApiLibrary {
+public interface LibUsbHidApiLibrary extends HidRawHidApiLibrary {
 
-    LibusbHidApiLibrary INSTANCE = Native.load(
-            "hidapi-libusb", LibusbHidApiLibrary.class);
+    LibUsbHidApiLibrary INSTANCE = Native.load(
+            "hidapi-libusb", LibUsbHidApiLibrary.class);
 
 }
