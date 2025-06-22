@@ -59,7 +59,7 @@ public class HidDevice {
   private final int interfaceNumber;
 
   private final boolean autoDataRead;
-  private final int dataReadInterval;
+  private final long dataReadInterval;
 
   /**
    * The data read thread
@@ -78,7 +78,7 @@ public class HidDevice {
 
     this.hidDeviceManager = hidDeviceManager;
 
-    this.dataReadInterval = hidServicesSpecification.getDataReadInterval();
+    this.dataReadInterval = hidServicesSpecification.getDataReadIntervalMs();
     this.autoDataRead = hidServicesSpecification.isAutoDataRead();
 
     this.hidDeviceStructure = null;
