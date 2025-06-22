@@ -27,6 +27,7 @@ import org.hid4java.HidDevice;
 import org.hid4java.HidServicesListener;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Range;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,7 +65,7 @@ public class HidServicesListenerList {
      *
      * @return An unmodifiable view of the listeners.
      */
-    public @NotNull List<HidServicesListener> getListeners() {
+    public final @NotNull List<HidServicesListener> getListeners() {
         return Collections.unmodifiableList(listeners);
     }
 
@@ -115,13 +116,7 @@ public class HidServicesListenerList {
         }
     }
 
-    /*
-     * We use a copy to make sure no concurrent modifications occur while
-     * processing an event. Even if we obtain a lock to process the events,
-     * a listener removing itself (or adding another listener) could result
-     * in a deadlock.
-     */
-    private List<HidServicesListener> copyListeners() {
+    private @NotNull List<HidServicesListener> copyListeners() {
         listenersLock.readLock().lock();
         try {
             List<HidServicesListener> copy = new ArrayList<>();
@@ -133,10 +128,18 @@ public class HidServicesListenerList {
     }
 
     private void fireHidEvent(
-            HidServicesEvent event,
-            BiConsumer<HidServicesListener, HidServicesEvent> callback
+            @NotNull HidServicesEvent event,
+            @NotNull BiConsumer<@NotNull HidServicesListener,
+                    @NotNull HidServicesEvent> callback
     ) {
+        /*
+         * We use a copy to make sure no concurrent modifications occur while
+         * processing an event. Even if we obtain a lock to process the events,
+         * a listener removing itself (or adding another listener) could result
+         * in a deadlock.
+         */
         List<HidServicesListener> listeners = this.copyListeners();
+
         for (HidServicesListener listener : listeners) {
             try {
                 callback.accept(listener, event);
@@ -184,6 +187,7 @@ public class HidServicesListenerList {
      * @see HidServicesListener#hidFailure(HidServicesEvent)
      */
     public void fireHidFailure(@Nullable HidDevice hidDevice) {
+        /* TODO: why is this unused, where would it be called? */
         executorService.submit(() -> {
             HidServicesEvent event = new HidServicesEvent(hidDevice);
             this.fireHidEvent(event, HidServicesListener::hidFailure);
@@ -199,7 +203,8 @@ public class HidServicesListenerList {
      *                              are {@code null}.
      * @see HidServicesListener#hidDataReceived(HidServicesEvent)
      */
-    public void fireHidDataReceived(@NotNull HidDevice hidDevice, byte @NotNull [] data) {
+    public void fireHidDataReceived(
+            @NotNull HidDevice hidDevice, byte @NotNull [] data) {
         Objects.requireNonNull(hidDevice, "hidDevice cannot be null");
         Objects.requireNonNull(data, "data cannot be null");
         executorService.submit(() -> {
@@ -208,7 +213,8 @@ public class HidServicesListenerList {
         });
     }
 
-    private static Thread createEventThread(Runnable runnable) {
+    private static @NotNull Thread
+    createEventThread(@NotNull Runnable runnable) {
         Thread eventThread = Executors
                 .defaultThreadFactory()
                 .newThread(runnable);
@@ -220,7 +226,8 @@ public class HidServicesListenerList {
     }
 
     @SuppressWarnings("SameParameterValue")
-    private static ExecutorService createEventThreadPool(int threadCount) {
+    private static @NotNull ExecutorService
+    createEventThreadPool(int threadCount) {
         return Executors.newFixedThreadPool(
                 threadCount,
                 HidServicesListenerList::createEventThread

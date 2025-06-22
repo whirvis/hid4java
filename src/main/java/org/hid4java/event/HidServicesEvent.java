@@ -111,11 +111,10 @@ public class HidServicesEvent {
 
     @Override
     public @NotNull String toString() {
-        return this.getClass().getSimpleName() +
-                "{" +
+        return this.getClass().getSimpleName() + "[" +
                 "device=" + device + "," +
                 "data=" + Arrays.toString(data) +
-                "}";
+                "]";
     }
 
     private static byte @Nullable []
