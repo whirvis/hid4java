@@ -120,7 +120,7 @@ public class HidApi {
     } else if (Platform.isMac()) {
       hidApiLibrary = DarwinHidApiLibrary.INSTANCE;
     } else {
-      hidApiLibrary = HidrawHidApiLibrary.INSTANCE;
+      hidApiLibrary = HidRawHidApiLibrary.INSTANCE;
     }
 
     hidApiLibrary.hid_init();

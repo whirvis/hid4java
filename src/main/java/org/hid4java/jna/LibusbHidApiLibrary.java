@@ -31,7 +31,7 @@ import com.sun.jna.Native;
  *
  * @since 0.7.0
  */
-public interface LibusbHidApiLibrary extends HidrawHidApiLibrary {
+public interface LibusbHidApiLibrary extends HidRawHidApiLibrary {
 
     LibusbHidApiLibrary INSTANCE = Native.load(
             "hidapi-libusb", LibusbHidApiLibrary.class);

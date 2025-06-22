@@ -31,7 +31,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * @since 0.7.0
  */
-public interface HidrawHidApiLibrary extends HidApiLibrary {
+public interface HidRawHidApiLibrary extends HidApiLibrary {
 
     @NotNull HidApiLibrary INSTANCE = Native.load(
             "hidapi", HidApiLibrary.class);

@@ -30,7 +30,7 @@ import org.jetbrains.annotations.NotNull;
 /**
  * JNA proxy to the Darwin HID API library.
  */
-public interface DarwinHidApiLibrary extends HidrawHidApiLibrary {
+public interface DarwinHidApiLibrary extends HidRawHidApiLibrary {
 
     @NotNull DarwinHidApiLibrary INSTANCE = Native.load(
             "hidapi", DarwinHidApiLibrary.class);
