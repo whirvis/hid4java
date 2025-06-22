@@ -148,10 +148,10 @@ class HidDeviceManager {
 
     for (HidDevice attachedDevice : attachedHidDeviceList) {
 
-      if (!this.attachedDevices.containsKey(attachedDevice.getId())) {
+      if (!this.attachedDevices.containsKey(attachedDevice.getPath())) {
 
         // Device has become attached so add it but do not open
-        attachedDevices.put(attachedDevice.getId(), attachedDevice);
+        attachedDevices.put(attachedDevice.getPath(), attachedDevice);
 
         // Fire the event on a separate thread
         listenerList.fireHidDeviceAttached(attachedDevice);
