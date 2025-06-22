@@ -22,18 +22,18 @@
  * SOFTWARE.
  *
  */
-
 package org.hid4java.jna;
 
 import com.sun.jna.Native;
 
 /**
- * JNA library interface to act as the proxy for the underlying native library
- * This approach removes the need for any JNI or native code
+ * JNA proxy to the LibUSB implementation of the HID API library.
+ *
  * @since 0.7.0
  */
 public interface LibusbHidApiLibrary extends HidrawHidApiLibrary {
 
-  LibusbHidApiLibrary INSTANCE = Native.load("hidapi-libusb", LibusbHidApiLibrary.class);
+    LibusbHidApiLibrary INSTANCE = Native.load(
+            "hidapi-libusb", LibusbHidApiLibrary.class);
 
 }
