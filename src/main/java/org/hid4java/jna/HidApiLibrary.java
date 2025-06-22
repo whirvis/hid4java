@@ -92,14 +92,14 @@ public interface HidApiLibrary extends Library {
     @Nullable Pointer hid_error(@NotNull Pointer device);
 
     /**
-     * Read an input report from an HID device.
-     * <br>
+     * Reads an input report from an HID device.
+     * <p>
      * Input reports are returned to the host through the INTERRUPT
      * IN endpoint. The first byte will contain the report number if
      * the device uses numbered reports.
      *
      * @param device The device handle.
-     * @param bytes  A buffer to write the read data into.
+     * @param buffer A buffer to write the read data into.
      * @param length The number of bytes to read. <b>For devices with
      *               multiple reports, make sure to read an extra byte
      *               for the report number.</b>
@@ -110,19 +110,19 @@ public interface HidApiLibrary extends Library {
     @Range(from = -1L, to = Integer.MAX_VALUE)
     int hid_read(
             @NotNull Pointer device,
-            @NotNull WideStringBuffer.ByReference bytes,
+            @NotNull WideStringBuffer.ByReference buffer,
             @Range(from = 0L, to = Integer.MAX_VALUE) int length
     );
 
     /**
-     * Read an input report from an HID device with a timeout.
-     * <br>
+     * Reads an input report from an HID device with a timeout.
+     * <p>
      * Input reports are returned to the host through the INTERRUPT
      * IN endpoint. The first byte will contain the report number if
      * the device uses numbered reports.
      *
      * @param device  The device handle.
-     * @param bytes   A buffer to write the read data into.
+     * @param buffer  A buffer to write the read data into.
      * @param length  The number of bytes to read. <b>For devices with
      *                multiple reports, make sure to read an extra byte
      *                for the report number.</b>
@@ -134,14 +134,14 @@ public interface HidApiLibrary extends Library {
     @Range(from = -1L, to = Integer.MAX_VALUE)
     int hid_read_timeout(
             @NotNull Pointer device,
-            @NotNull WideStringBuffer.ByReference bytes,
+            @NotNull WideStringBuffer.ByReference buffer,
             @Range(from = 0L, to = Integer.MAX_VALUE) int length,
             @Range(from = -1L, to = Integer.MAX_VALUE) int timeout
     );
 
     /**
-     * Write an output report to an HID device.
-     * <br>
+     * Writes an output report to an HID device.
+     * <p>
      * The first byte of data must contain the report ID. For devices that
      * only support a single report, use {@code 0x00}. The remaining bytes
      * should contain the actual report data.
@@ -171,7 +171,7 @@ public interface HidApiLibrary extends Library {
      * the report data will start at {@code data[1]}.
      *
      * @param device The device handle.
-     * @param data   A buffer to write the data into.
+     * @param buffer A buffer to write the data into.
      * @param length The number of bytes to read,
      *               <b>including the report ID.</b>
      * @return The number of bytes read, {@code -1} on error.
@@ -179,12 +179,12 @@ public interface HidApiLibrary extends Library {
     @Range(from = -1L, to = Integer.MAX_VALUE)
     int hid_get_feature_report(
             @NotNull Pointer device,
-            @NotNull WideStringBuffer.ByReference data,
+            @NotNull WideStringBuffer.ByReference buffer,
             @Range(from = 0L, to = Integer.MAX_VALUE) int length
     );
 
     /**
-     * Send a feature report to the device.
+     * Sends a feature report to an HID device.
      * <p>
      * Feature reports are sent over the control endpoint as a
      * {@code set_report} transfer.
@@ -284,14 +284,14 @@ public interface HidApiLibrary extends Library {
     );
 
     /**
-     * Sets the device handle to be non-blocking.
+     * Sets an HID device handle to be non-blocking.
      * <p>
      * In non-blocking mode, calls to {@code hid_read()} will immediately
-     * return with a value of zero if there is no data to be read.
-     * <br>
-     * In blocking mode, {@code hid_read()} will block the current thread
-     * until there is data to read before returning.
-     * <br>
+     * return with a value of zero if there is no data to be read. In
+     * blocking mode, {@code hid_read()} will block the current thread
+     * until there is data to read before returning the number of bytes
+     * read.
+     * <p>
      * Non-blocking I/O can be turned on and off at any time.
      *
      * @param device       The device handle.
@@ -319,7 +319,7 @@ public interface HidApiLibrary extends Library {
      * @param product_id The product ID.
      * @return A linked list of all discovered matching devices.
      */
-    @NotNull HidDeviceInfoStructure hid_enumerate(
+    @Nullable HidDeviceInfoStructure hid_enumerate(
             @Range(from = 0x0000, to = 0xFFFF) short vendor_id,
             @Range(from = 0x0000, to = 0xFFFF) short product_id
     );
