@@ -124,6 +124,7 @@ public class HidDeviceInfoStructure
                 manufacturer_string,
                 product_id,
                 usage_page,
+                usage,
                 interface_number
         );
     }
@@ -148,6 +149,7 @@ public class HidDeviceInfoStructure
                 && Objects.equals(manufacturer_string, that.manufacturer_string)
                 && Objects.equals(product_string, that.product_string)
                 && Objects.equals(usage_page, that.usage_page)
+                && Objects.equals(usage, that.usage)
                 && Objects.equals(interface_number, that.interface_number);
     }
 
@@ -155,13 +157,14 @@ public class HidDeviceInfoStructure
     public @NotNull String toString() {
         return "HID device\n" +
                 String.format("path: %s\n", path) +
-                String.format("vendor_id: %04x\n", vendor_id) +
-                String.format("product_id: %04x\n", product_id) +
+                String.format("vendor_id: 0x%04x\n", vendor_id) +
+                String.format("product_id: 0x%04x\n", product_id) +
                 String.format("serial_number: %s\n", serial_number) +
                 String.format("release_number: %d\n", release_number) +
                 String.format("manufacturer_string: %s\n", manufacturer_string) +
                 String.format("product_string: %s\n", product_string) +
                 String.format("usage_page: %d\n", usage_page) +
+                String.format("usage: %d\n", usage) +
                 String.format("interface_number: %d", interface_number);
     }
 
