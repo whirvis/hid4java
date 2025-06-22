@@ -1,7 +1,7 @@
 /*
- * The MIT License (MIT)
+ * the MIT License (MIT)
  *
- * Copyright (c) 2014-2015 Gary Rowe
+ * Copyright (c) 2014-2025 Gary Rowe, "Whirvis" Trent Summerlin
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -10,7 +10,7 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
+ * the above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -20,65 +20,109 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
  */
-
 package org.hid4java.event;
 
 import org.hid4java.HidDevice;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Arrays;
-
+import java.util.Objects;
 
 /**
- * Event to provide the following to API consumers:
- * <ul>
- * <li>Provision of HID device information</li>
- * </ul>
+ * Describes an event relating to an HID device.
  *
  * @since 0.0.1
  */
 public class HidServicesEvent {
 
-  private final HidDevice hidDevice;
-  private final byte[] dataReceived;
+    private final @Nullable HidDevice device;
+    private final byte @Nullable [] data;
 
-  /**
-   * @param device The HidDevice involved in the event
-   */
-  public HidServicesEvent(HidDevice device) {
-    hidDevice = device;
-    dataReceived = null;
-  }
+    /**
+     * Constructs a new {@code HidServicesEvent}.
+     *
+     * @param device The device that triggered the event.
+     */
+    public HidServicesEvent(@Nullable HidDevice device) {
+        this.device = device;
+        this.data = null;
+    }
 
-  /**
-   * @param device The HidDevice involved in the event
-   * @param dataReceived The contents of all data read
-   * @since 0.8.0
-   */
-  public HidServicesEvent(HidDevice device, byte[] dataReceived) {
-    hidDevice = device;
-    this.dataReceived = Arrays.copyOf(dataReceived, dataReceived.length);
-  }
+    /**
+     * Constructs a new {@code HidServicesEvent}.
+     *
+     * @param device The device that triggered the event.
+     * @param data   The data received from this event.
+     * @since 0.8.0
+     */
+    public HidServicesEvent(
+            @Nullable HidDevice device,
+            byte @Nullable [] data) {
+        this.device = device;
+        this.data = copyOfOrNull(data);
+    }
 
-  /**
-   * @return The associated HidDevice
-   */
-  public HidDevice getHidDevice() {
-    return hidDevice;
-  }
+    /**
+     * Returns the device that triggered the event.
+     *
+     * @return The device that triggered the event.
+     */
+    public final @Nullable HidDevice getDevice() {
+        return this.device;
+    }
 
-  /**
-   * @return The data received (might be multiple packets of data)
-   */
-  public byte[] getDataReceived() {
-    return dataReceived;
-  }
+    /**
+     * Returns a copy of the received data.
+     * <p>
+     * <b>Note:</b> This may be multiple packets of data.
+     *
+     * @return A copy of the received data.
+     */
+    public final byte @Nullable [] getDataReceived() {
+        /*
+         * Although we made a copy in the constructor, we don't want
+         * callers of this method to modify it for the next invocations
+         * of this method.
+         */
+        return copyOfOrNull(data);
+    }
 
-  @Override
-  public String toString() {
-    return "HidServicesEvent{" +
-      "hidDevice=" + hidDevice +
-      '}';
-  }
+    @Override
+    public boolean equals(@Nullable Object obj) {
+        if (obj == this) {
+            return true; /* we equal ourselves */
+        } else if (obj == null) {
+            return false; /* nothing to compare with */
+        } else if (obj.getClass() != this.getClass()) {
+            return false; /* child must implement */
+        }
+
+        HidServicesEvent that = (HidServicesEvent) obj;
+        return Objects.equals(device, that.device)
+                && Arrays.equals(data, that.data);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(device, Arrays.hashCode(data));
+    }
+
+    @Override
+    public @NotNull String toString() {
+        return this.getClass().getSimpleName() +
+                "{" +
+                "device=" + device + "," +
+                "data=" + Arrays.toString(data) +
+                "}";
+    }
+
+    private static byte @Nullable []
+    copyOfOrNull(byte @Nullable [] data) {
+        return data != null
+                ? Arrays.copyOf(data, data.length)
+                : null;
+    }
+
 }
