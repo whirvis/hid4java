@@ -29,7 +29,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Wrapper for a buffer containing {@code wchar_t} elements.
