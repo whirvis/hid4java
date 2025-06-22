@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2014-2015 Gary Rowe
+ * Copyright (c) 2014-2025 Gary Rowe, "Whirvis" Trent Summerlin
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -20,61 +20,72 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
  */
-
 package org.hid4java;
 
+import org.jetbrains.annotations.NotNull;
+
+import java.util.Objects;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
- * Factory to provide the following to API consumers:
- * <ul>
- * <li>Access to configured HID services</li>
- * </ul>
+ * Factory for configured HID services.
  *
  * @since 0.0.1
  */
 public class HidManager {
 
-  private static final Object servicesLock = new Object();
+    private static final Lock SERVICES_LOCK = new ReentrantLock();
 
-  private static HidServices hidServices = null;
+    private static HidServices hidServices = null;
 
-  /**
-   * Simple service provider providing generally safe defaults. If you find you are experiencing problems, particularly
-   * with constrained devices, consider exploring the {@link HidServicesSpecification} options.
-   *
-   * @return A single instance of the HID services using the default specification
-   */
-  public static HidServices getHidServices() throws HidException {
-
-    synchronized (servicesLock) {
-      if (null == hidServices) {
-        // Use defaults
-        hidServices = getHidServices(new HidServicesSpecification());
-      }
+    /**
+     * Returns the HID services.
+     * <p>
+     * If the HID services have not yet been initialized, this method will
+     * initialize them with the default parameters.
+     *
+     * @return The HID services.
+     * @see #getHidServices(HidServicesSpecification)
+     */
+    public static @NotNull HidServices getHidServices() {
+        SERVICES_LOCK.lock();
+        try {
+            if (hidServices == null) {
+                hidServices = new HidServices();
+            }
+            return hidServices;
+        } finally {
+            SERVICES_LOCK.unlock();
+        }
     }
 
-    return hidServices;
-
-  }
-
-  /**
-   * Fully configurable service provider
-   *
-   * @param hidServicesSpecification Provides various parameters for configuring HID services
-   * @return A single instance of the HID services using specified parameters
-   * @since 0.5.0
-   */
-  public static HidServices getHidServices(HidServicesSpecification hidServicesSpecification) throws HidException {
-
-    synchronized (servicesLock) {
-      if (null == hidServices) {
-        hidServices = new HidServices(hidServicesSpecification);
-      }
+    /**
+     * Initializes the HID services with the specified parameters.
+     *
+     * @param specs The parameters for configuring HID services.
+     * @return A single instance of the HID services using the specified
+     * parameters.
+     * @throws NullPointerException  If {@code specs} are {@code null}.
+     * @throws IllegalStateException If this method has already been called
+     *                               (use {@link #getHidServices()}).
+     * @since 0.5.0
+     */
+    public static @NotNull HidServices getHidServices(
+            @NotNull HidServicesSpecification specs) {
+        Objects.requireNonNull(specs, "specs cannot be null");
+        SERVICES_LOCK.lock();
+        try {
+            if (hidServices != null) {
+                String message = "HID services already initialized";
+                throw new IllegalStateException(message);
+            }
+            hidServices = new HidServices(specs);
+            return hidServices;
+        } finally {
+            SERVICES_LOCK.unlock();
+        }
     }
-
-    return hidServices;
-
-  }
 
 }
