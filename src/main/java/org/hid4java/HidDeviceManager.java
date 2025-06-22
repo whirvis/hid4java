@@ -219,7 +219,7 @@ class HidDeviceManager {
           this,
           hidServicesSpecification));
         // Move to the next in the linked list
-        hidDeviceInfoStructure = hidDeviceInfoStructure.next();
+        hidDeviceInfoStructure = hidDeviceInfoStructure.next;
       } while (hidDeviceInfoStructure != null);
 
       // Dispose of the device list to free memory
