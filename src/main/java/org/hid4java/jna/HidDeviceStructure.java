@@ -1,7 +1,7 @@
 /*
- * The MIT License (MIT)
+ * the MIT License (MIT)
  *
- * Copyright (c) 2014-2015 Gary Rowe
+ * Copyright (c) 2014-2025 Gary Rowe, "Whirvis" Trent Summerlin
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -10,7 +10,7 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
+ * the above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -20,35 +20,70 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
  */
-
 package org.hid4java.jna;
 
 import com.sun.jna.Pointer;
 import com.sun.jna.Structure;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
- * Low level JNA value object to provide a HID device pointer
+ * Represents an {@code HidDevice} structure.
+ *
  * @since 0.1.0
  */
-public class HidDeviceStructure extends Structure implements Structure.ByReference {
+public class HidDeviceStructure
+        extends Structure
+        implements Structure.ByReference {
 
-  public Pointer ptr;
+    /**
+     * The structure pointer.
+     */
+    public final @NotNull Pointer ptr;
 
-  public HidDeviceStructure(Pointer p) {
-    ptr = p;
-  }
+    /**
+     * Constructs a new {@code HidDeviceStructure}.
+     *
+     * @param ptr The structure pointer.
+     * @throws NullPointerException If {@code ptr} is {@code null}.
+     */
+    public HidDeviceStructure(@NotNull Pointer ptr) {
+        Objects.requireNonNull(ptr, "ptr cannot be null");
+        this.ptr = ptr;
+    }
 
-  public Pointer ptr() {
-    return ptr;
-  }
+    @Override
+    protected @NotNull List<@NotNull String> getFieldOrder() {
+        return Collections.singletonList("ptr");
+    }
 
-  @Override
-  protected List getFieldOrder() {
-    return Arrays.asList("ptr");
-  }
+    @Override
+    public int hashCode() {
+        return ptr.hashCode();
+    }
+
+    @Override
+    public boolean equals(@Nullable Object obj) {
+        if (obj == this) {
+            return true; /* we equal ourselves */
+        } else if (obj == null) {
+            return false; /* nothing to compare with */
+        } else if (obj.getClass() != this.getClass()) {
+            return false; /* child must implement */
+        }
+
+        HidDeviceStructure that = (HidDeviceStructure) obj;
+        return ptr.equals(that.ptr);
+    }
+
+    @Override
+    public @NotNull String toString() {
+        return ptr.toString();
+    }
+
 }

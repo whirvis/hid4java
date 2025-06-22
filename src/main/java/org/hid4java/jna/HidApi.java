@@ -156,7 +156,7 @@ public class HidApi {
   public static void close(HidDeviceStructure device) {
 
     if (device != null) {
-      hidApiLibrary.hid_close(device.ptr());
+      hidApiLibrary.hid_close(device.ptr);
     }
 
   }
@@ -195,7 +195,7 @@ public class HidApi {
       return DEVICE_NULL;
     }
 
-    Pointer p = hidApiLibrary.hid_error(device.ptr());
+    Pointer p = hidApiLibrary.hid_error(device.ptr);
 
     return p == null ? null : new WideStringBuffer(p.getByteArray(0, WSTR_LEN)).toString();
   }
@@ -211,7 +211,7 @@ public class HidApi {
     }
 
     WideStringBuffer wStr = new WideStringBuffer(WSTR_LEN);
-    hidApiLibrary.hid_get_manufacturer_string(device.ptr(), wStr, WSTR_LEN);
+    hidApiLibrary.hid_get_manufacturer_string(device.ptr, wStr, WSTR_LEN);
 
     return wStr.toString();
   }
@@ -227,7 +227,7 @@ public class HidApi {
     }
 
     WideStringBuffer wBuffer = new WideStringBuffer(WSTR_LEN);
-    hidApiLibrary.hid_get_product_string(device.ptr(), wBuffer, WSTR_LEN);
+    hidApiLibrary.hid_get_product_string(device.ptr, wBuffer, WSTR_LEN);
 
     return wBuffer.toString();
   }
@@ -244,7 +244,7 @@ public class HidApi {
 
     WideStringBuffer wBuffer = new WideStringBuffer(WSTR_LEN);
 
-    hidApiLibrary.hid_get_serial_number_string(device.ptr(), wBuffer, WSTR_LEN);
+    hidApiLibrary.hid_get_serial_number_string(device.ptr, wBuffer, WSTR_LEN);
 
     return wBuffer.toString();
   }
@@ -263,7 +263,7 @@ public class HidApi {
    */
   public static boolean setNonBlocking(HidDeviceStructure device, boolean nonBlocking) {
 
-    return device != null && 0 == hidApiLibrary.hid_set_nonblocking(device.ptr(), nonBlocking ? 1 : 0);
+    return device != null && 0 == hidApiLibrary.hid_set_nonblocking(device.ptr, nonBlocking ? 1 : 0);
 
   }
 
@@ -285,7 +285,7 @@ public class HidApi {
 
     WideStringBuffer wBuffer = new WideStringBuffer(buffer);
 
-    int result = hidApiLibrary.hid_read(device.ptr(), wBuffer, wBuffer.buffer.length);
+    int result = hidApiLibrary.hid_read(device.ptr, wBuffer, wBuffer.buffer.length);
 
     if (result > 0) {
       logTraffic(wBuffer, false);
@@ -312,7 +312,7 @@ public class HidApi {
 
     WideStringBuffer wBuffer = new WideStringBuffer(buffer);
 
-    int result = hidApiLibrary.hid_read_timeout(device.ptr(), wBuffer, buffer.length, timeoutMillis);
+    int result = hidApiLibrary.hid_read_timeout(device.ptr, wBuffer, buffer.length, timeoutMillis);
 
     if (result > 0) {
       logTraffic(wBuffer, false);
@@ -344,7 +344,7 @@ public class HidApi {
     // Create a large buffer
     WideStringBuffer report = new WideStringBuffer(WSTR_LEN);
     report.buffer[0] = reportId;
-    int res = hidApiLibrary.hid_get_feature_report(device.ptr(), report, data.length + 1);
+    int res = hidApiLibrary.hid_get_feature_report(device.ptr, report, data.length + 1);
 
     if (res == -1) {
       return res;
@@ -393,7 +393,7 @@ public class HidApi {
 
     logTraffic(report, true);
 
-    return hidApiLibrary.hid_send_feature_report(device.ptr(), report, report.buffer.length);
+    return hidApiLibrary.hid_send_feature_report(device.ptr, report, report.buffer.length);
 
   }
 
@@ -442,7 +442,7 @@ public class HidApi {
 
     logTraffic(report, true);
 
-    return hidApiLibrary.hid_write(device.ptr(), report, report.buffer.length);
+    return hidApiLibrary.hid_write(device.ptr, report, report.buffer.length);
 
   }
 
@@ -459,7 +459,7 @@ public class HidApi {
       return DEVICE_NULL;
     }
     WideStringBuffer wStr = new WideStringBuffer(WSTR_LEN);
-    int res = hidApiLibrary.hid_get_indexed_string(device.ptr(), idx, wStr, WSTR_LEN);
+    int res = hidApiLibrary.hid_get_indexed_string(device.ptr, idx, wStr, WSTR_LEN);
 
     return res == -1 ? null : wStr.toString();
   }
@@ -480,7 +480,7 @@ public class HidApi {
     if (device == null) {
       return -1;
     }
-    return hidApiLibrary.hid_get_report_descriptor(device.ptr(), buffer, size);
+    return hidApiLibrary.hid_get_report_descriptor(device.ptr, buffer, size);
   }
 
   /**
