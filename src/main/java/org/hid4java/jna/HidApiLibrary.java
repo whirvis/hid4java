@@ -1,7 +1,7 @@
 /*
- * The MIT License (MIT)
+ * the MIT License (MIT)
  *
- * Copyright (c) 2014-2015 Gary Rowe
+ * Copyright (c) 2014-2025 Gary Rowe, "Whirvis" Trent Summerlin
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -10,7 +10,7 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
+ * the above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -20,258 +20,335 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
  */
-
 package org.hid4java.jna;
 
 import com.sun.jna.Library;
 import com.sun.jna.Pointer;
 import com.sun.jna.WString;
+import org.hid4java.HidDevice;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Range;
 
 /**
- * JNA library interface to act as the proxy for the underlying native library
- * This approach removes the need for any JNI or native code
+ * JNA proxy to the HID API library.
  *
  * @since 0.1.0
  */
 public interface HidApiLibrary extends Library {
 
-  /**
-   * Initialize the HIDAPI library.
-   * This function initializes the HIDAPI library. Calling it is not strictly necessary,
-   * as it will be called automatically by hid_enumerate() and any of the hid_open_*() functions
-   * if it is needed. This function should be called at the beginning of execution however,
-   * if there is a chance of HIDAPI handles being opened by different threads simultaneously.
-   */
-  void hid_init();
+    /**
+     * Initializes the HID API library.
+     * <p>
+     * Calling this function is not strictly necessary. It will be called
+     * by {@code hid_enumerate()} or {@code hid_open_*()} if needed.
+     * <p>
+     * However, this function should be called at the start of execution
+     * if any HID API handles could be opened by different threads.
+     */
+    void hid_init();
 
-  /**
-   * Finalize the HIDAPI library.
-   * <br>
-   * This function frees all the static data associated with HIDAPI. It should be called
-   * at the end of execution to avoid memory leaks.
-   */
-  void hid_exit();
+    /**
+     * Closes the HID API library.
+     * <p>
+     * This function frees all static data associated with HID API. It
+     * should be called at the end of execution to avoid memory leaks.
+     */
+    void hid_exit();
 
-  /**
-   * Open a HID device using a Vendor ID (VID), Product ID (PID) and optionally a serial number.
-   * <br>
-   * If serial_number is NULL, the first device with the specified VID and PID is opened.
-   *
-   * @param vendor_id     The vendor ID
-   * @param product_id    The product ID
-   * @param serial_number The serial number (or null for wildcard)
-   * @return A pointer to a HidDevice on success or null on failure
-   */
-  Pointer hid_open(short vendor_id, short product_id, WString serial_number);
+    /**
+     * Opens the first HID device with the given vendor ID, product ID, and
+     * serial number. If no serial number is specified, the first device with
+     * the specified vendor ID and product ID is opened.
+     *
+     * @param vendor_id     The vendor ID.
+     * @param product_id    The product ID.
+     * @param serial_number The serial number, {@code null} for any.
+     * @return A pointer to an {@link HidDevice} on success, {@code null}
+     * on failure.
+     */
+    @Nullable Pointer hid_open(
+            @Range(from = 0x0000, to = 0xFFFF) short vendor_id,
+            @Range(from = 0x0000, to = 0xFFFF) short product_id,
+            @Nullable WString serial_number
+    );
 
-  /**
-   * Close a HID device
-   *
-   * @param device A device handle
-   */
-  void hid_close(Pointer device);
+    /**
+     * Closes an HID device.
+     *
+     * @param device The device handle.
+     */
+    void hid_close(@NotNull Pointer device);
 
-  /**
-   * Get a string describing the last error which occurred.
-   *
-   * @param device A device handle
-   * @return A string containing the last error which occurred or null if none has occurred.
-   */
-  Pointer hid_error(Pointer device);
+    /**
+     * Returns a pointer to a string describing the last error
+     * which occurred for a device.
+     *
+     * @param device The device handle.
+     * @return A pointer to a string containing the last error,
+     * {@code null} if none has occurred.
+     */
+    @Nullable Pointer hid_error(@NotNull Pointer device);
 
-  /**
-   * Read an Input report from a HID device.
-   * <br>
-   * Input reports are returned to the host through the INTERRUPT IN endpoint. The first byte will contain the Report number
-   * if the device uses numbered reports.
-   *
-   * @param device A device handle returned from hid_open().
-   * @param bytes  A buffer to put the read data into.
-   * @param length The number of bytes to read. For devices with multiple reports, make sure to read an extra byte for the report number.
-   * @return This function returns the actual number of bytes read and -1 on error. If no packet was available to be read
-   * and the handle is in non-blocking mode this function returns 0.
-   */
-  int hid_read(Pointer device, WideStringBuffer.ByReference bytes, int length);
+    /**
+     * Read an input report from an HID device.
+     * <br>
+     * Input reports are returned to the host through the INTERRUPT
+     * IN endpoint. The first byte will contain the report number if
+     * the device uses numbered reports.
+     *
+     * @param device The device handle.
+     * @param bytes  A buffer to write the read data into.
+     * @param length The number of bytes to read. <b>For devices with
+     *               multiple reports, make sure to read an extra byte
+     *               for the report number.</b>
+     * @return The number of bytes read, {@code -1} on error. If there is
+     * no data to be read and the handle is in non-blocking mode, {@code 0}
+     * is returned immediately.
+     */
+    @Range(from = -1L, to = Integer.MAX_VALUE)
+    int hid_read(
+            @NotNull Pointer device,
+            @NotNull WideStringBuffer.ByReference bytes,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length
+    );
 
-  /**
-   * Read an Input report from a HID device with timeout.
-   * <br>
-   * Input reports are returned to the host through the INTERRUPT IN endpoint. The first byte will contain the Report number
-   * if the device uses numbered reports.
-   *
-   * @param device  A device handle
-   * @param bytes   A buffer to put the read data into.
-   * @param length  The number of bytes to read. For devices with multiple reports, make sure to read an extra byte for the report number.
-   * @param timeout The timeout in milliseconds or -1 for blocking wait.
-   * @return This function returns the actual number of bytes read and -1 on error. If no packet was available to be read within
-   * the timeout period, this function returns 0.
-   */
-  int hid_read_timeout(Pointer device, WideStringBuffer.ByReference bytes, int length, int timeout);
+    /**
+     * Read an input report from an HID device with a timeout.
+     * <br>
+     * Input reports are returned to the host through the INTERRUPT
+     * IN endpoint. The first byte will contain the report number if
+     * the device uses numbered reports.
+     *
+     * @param device  The device handle.
+     * @param bytes   A buffer to write the read data into.
+     * @param length  The number of bytes to read. <b>For devices with
+     *                multiple reports, make sure to read an extra byte
+     *                for the report number.</b>
+     * @param timeout The timeout in milliseconds, or {@code -1} to
+     *                wait indefinitely.
+     * @return The number of bytes read, {@code -1} on error. If there is
+     * no data to be read within the timeout, {@code 0} is returned.
+     */
+    @Range(from = -1L, to = Integer.MAX_VALUE)
+    int hid_read_timeout(
+            @NotNull Pointer device,
+            @NotNull WideStringBuffer.ByReference bytes,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length,
+            @Range(from = -1L, to = Integer.MAX_VALUE) int timeout
+    );
 
-  /**
-   * Write an Output report to a HID device.
-   * <br>
-   * The first byte of data[] must contain the Report ID. For devices which only support a single report, this must be set to 0x0.
-   * The remaining bytes contain the report data.
-   * <br>
-   * Since the Report ID is mandatory, calls to hid_write() will always contain one more byte than the report contains.
-   * <br>
-   * For example, if a hid report is 16 bytes long, 17 bytes must be passed to hid_write(), the Report ID (or 0x0, for devices with
-   * a single report), followed by the report data (16 bytes). In this example, the length passed in would be 17.
-   * <br>
-   * hid_write() will send the data on the first OUT endpoint, if one exists. If it does not, it will send the data through the
-   * Control Endpoint (Endpoint 0).
-   *
-   * @param device A device handle
-   * @param data   the data to send, including the report number as the first byte
-   * @param len    The length in bytes of the data to send
-   * @return The actual number of bytes written, -1 on error
-   */
-  int hid_write(Pointer device, WideStringBuffer.ByReference data, int len);
+    /**
+     * Write an output report to an HID device.
+     * <br>
+     * The first byte of data must contain the report ID. For devices that
+     * only support a single report, use {@code 0x00}. The remaining bytes
+     * should contain the actual report data.
+     * <p>
+     * This function will send the data to the first OUT endpoint, if one
+     * exists. If it does not, it will send the data through the control
+     * endpoint (endpoint 0).
+     *
+     * @param device The device handle.
+     * @param data   The data to send.
+     * @param length The number of bytes to send,
+     *               <b>including the report ID.</b>
+     * @return The number of bytes written, {@code -1} on error.
+     */
+    @Range(from = -1L, to = Integer.MAX_VALUE)
+    int hid_write(
+            @NotNull Pointer device,
+            @NotNull WideStringBuffer.ByReference data,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length
+    );
 
-  /**
-   * Get a feature report from a HID device.
-   * <br>
-   * Set the first byte of data[] to the Report ID of the report to be read. Make sure to allow space for this extra byte in data[].
-   * Upon return, the first byte will still contain the Report ID, and the report data will start in data[1].
-   *
-   * @param device A device handle
-   * @param data   A buffer to put the read data into, including the Report ID. Set the first byte of data[] to the Report ID of the report to be read, or set it to zero if your device does not use numbered reports.
-   * @param length The number of bytes to read, including an extra byte for the report ID. The buffer can be longer than the actual report.
-   * @return The number of bytes read plus one for the report ID (which is still in the first byte), or -1 on error
-   */
-  int hid_get_feature_report(Pointer device, WideStringBuffer.ByReference data, int length);
+    /**
+     * Gets a feature report from an HID device.
+     * <p>
+     * <b>Note:</b> Set the first byte to the ID of the report to read.
+     * Upon return, the first byte will still contain the report ID, and
+     * the report data will start at {@code data[1]}.
+     *
+     * @param device The device handle.
+     * @param data   A buffer to write the data into.
+     * @param length The number of bytes to read,
+     *               <b>including the report ID.</b>
+     * @return The number of bytes read, {@code -1} on error.
+     */
+    @Range(from = -1L, to = Integer.MAX_VALUE)
+    int hid_get_feature_report(
+            @NotNull Pointer device,
+            @NotNull WideStringBuffer.ByReference data,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length
+    );
 
-  /**
-   * Send a Feature report to the device.
-   * <br>
-   * Feature reports are sent over the Control endpoint as a Set_Report transfer.
-   * <br>
-   * The first byte of data[] must contain the Report ID. For devices which only support a single report, this must be set to 0x0.
-   * <br>
-   * The remaining bytes contain the report data.
-   * <br>
-   * Since the Report ID is mandatory, calls to hid_send_feature_report() will always contain one more byte than the report contains.
-   * <br>
-   * For example, if a hid report is 16 bytes long, 17 bytes must be passed to hid_send_feature_report():
-   * the Report ID (or 0x0, for devices which do not use numbered reports), followed by the report data (16 bytes).
-   * In this example, the length passed in would be 17.
-   *
-   * @param device The device handle
-   * @param data   The data to send, including the report number as the first byte
-   * @param length The length in bytes of the data to send, including the report number
-   * @return The actual number of bytes written, -1 on error
-   */
-  int hid_send_feature_report(Pointer device, WideStringBuffer.ByReference data, int length);
+    /**
+     * Send a feature report to the device.
+     * <p>
+     * Feature reports are sent over the control endpoint as a
+     * {@code set_report} transfer.
+     * <p>
+     * The first byte of data must contain the report ID. For devices that
+     * only support a single report, use {@code 0x00}. The remaining bytes
+     * should contain the actual report data.
+     *
+     * @param device The device handle.
+     * @param data   The data to send.
+     * @param length The number of bytes to send,
+     *               <b>including the report ID.</b>
+     * @return The number of bytes written, {@code -1} on error.
+     */
+    @Range(from = -1L, to = Integer.MAX_VALUE)
+    int hid_send_feature_report(
+            @NotNull Pointer device,
+            @NotNull WideStringBuffer.ByReference data,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length
+    );
 
-  /**
-   * Get a string from a HID device, based on its string index.
-   *
-   * @param device the device handle
-   * @param idx    The index of the string to get
-   * @param string A wide string buffer to put the data into
-   * @param len    The length of the buffer in multiples of wchar_t
-   * @return 0 on success, -1 on failure
-   */
-  int hid_get_indexed_string(Pointer device, int idx, WideStringBuffer.ByReference string, int len);
+    /**
+     * Gets an indexed string from an HID device.
+     *
+     * @param device The device handle.
+     * @param index  The index of the string to get.
+     * @param str    A wide string buffer to write the data into.
+     * @param length The buffer length in multiples of {@code wchar_t}.
+     * @return {@code 0} on success, {@code -1} on error.
+     */
+    @Range(from = -1L, to = 0L)
+    int hid_get_indexed_string(
+            @NotNull Pointer device,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int index,
+            @NotNull WideStringBuffer.ByReference str,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length
+    );
 
-  /**
-   * Get the manufacturer string from a HID device
-   *
-   * @param device the device handle
-   * @param buffer A byte buffer to put the data into
-   * @param size   The length of the buffer in multiple of wchar_t
-   * @return 0 on success, -1 on failure
-   */
-  @SuppressWarnings("UnusedReturnValue")
-  int hid_get_report_descriptor(Pointer device, byte[] buffer, int size);
+    /**
+     * Gets the report descriptor from an HID device.
+     *
+     * @param device The device handle.
+     * @param buffer A buffer to write the data into.
+     * @param length The buffer length in multiples of {@code wchar_t}.
+     * @return {@code 0} on success, {@code -1} on error.
+     */
+    @Range(from = -1L, to = 0L)
+    int hid_get_report_descriptor(
+            @NotNull Pointer device,
+            byte @NotNull [] buffer,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length
+    );
 
-  /**
-   * Get the manufacturer string from a HID device
-   *
-   * @param device the device handle
-   * @param str    A wide string buffer to put the data into
-   * @param len    The length of the buffer in multiple of wchar_t
-   * @return 0 on success, -1 on failure
-   */
-  @SuppressWarnings("UnusedReturnValue")
-  int hid_get_manufacturer_string(Pointer device, WideStringBuffer.ByReference str, int len);
+    /**
+     * Gets the manufacturer string from an HID device.
+     *
+     * @param device The device handle.
+     * @param str    A wide string buffer to write the data into.
+     * @param length The buffer length in multiples of {@code wchar_t}.
+     * @return {@code 0} on success, {@code -1} on error.
+     */
+    @Range(from = -1L, to = 0L)
+    int hid_get_manufacturer_string(
+            @NotNull Pointer device,
+            @NotNull WideStringBuffer.ByReference str,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length
+    );
 
-  /**
-   * Get the product number string from a HID device
-   *
-   * @param device the device handle
-   * @param str    A wide string buffer to put the data into
-   * @param len    The length of the buffer in multiple of wchar_t
-   * @return 0 on success, -1 on failure
-   */
-  @SuppressWarnings("UnusedReturnValue")
-  int hid_get_product_string(Pointer device, WideStringBuffer.ByReference str, int len);
+    /**
+     * Gets the product number string from an HID device.
+     *
+     * @param device The device handle.
+     * @param str    A wide string buffer to write the data into.
+     * @param length The buffer length in multiples of {@code wchar_t}.
+     * @return {@code 0} on success, {@code -1} on error.
+     */
+    @Range(from = -1L, to = 0L)
+    int hid_get_product_string(
+            @NotNull Pointer device,
+            @NotNull WideStringBuffer.ByReference str,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length
+    );
 
-  /**
-   * Get the serial number string from a HID device
-   *
-   * @param device the device handle
-   * @param str    A wide string buffer to put the data into
-   * @param len    The length of the buffer in multiple of wchar_t
-   * @return 0 on success, -1 on failure
-   */
-  @SuppressWarnings("UnusedReturnValue")
-  int hid_get_serial_number_string(Pointer device, WideStringBuffer.ByReference str, int len);
+    /**
+     * Gets the serial number string from an HID device.
+     *
+     * @param device The device handle.
+     * @param str    A wide string buffer to write the data into.
+     * @param length The buffer length in multiples of {@code wchar_t}.
+     * @return {@code 0} on success, {@code -1} on error.
+     */
+    @Range(from = -1L, to = 0L)
+    int hid_get_serial_number_string(
+            @NotNull Pointer device,
+            @NotNull WideStringBuffer.ByReference str,
+            @Range(from = 0L, to = Integer.MAX_VALUE) int length
+    );
 
-  /**
-   * Set the device handle to be non-blocking.
-   * <br>
-   * In non-blocking mode calls to hid_read() will return immediately with a value of 0 if there is no data to be read.
-   * <br>
-   * In blocking mode, hid_read() will wait (block) until there is data to read before returning.
-   * <br>
-   * Nonblocking can be turned on and off at any time.
-   *
-   * @param device   The device handle
-   * @param nonblock 0 disables non-blocking, 1 enables non-blocking
-   * @return 0 on success, -1 on error
-   */
-  int hid_set_nonblocking(Pointer device, int nonblock);
+    /**
+     * Sets the device handle to be non-blocking.
+     * <p>
+     * In non-blocking mode, calls to {@code hid_read()} will immediately
+     * return with a value of zero if there is no data to be read.
+     * <br>
+     * In blocking mode, {@code hid_read()} will block the current thread
+     * until there is data to read before returning.
+     * <br>
+     * Non-blocking I/O can be turned on and off at any time.
+     *
+     * @param device       The device handle.
+     * @param non_blocking {@code 0} to disable non-blocking,
+     *                     {@code 1} to enable non-blocking.
+     * @return {@code 0} on success, {@code -1} on error.
+     */
+    @Range(from = -1L, to = 0L)
+    int hid_set_nonblocking(
+            @NotNull Pointer device,
+            @Range(from = 0L, to = 1L) int non_blocking
+    );
 
-  /**
-   * Enumerate the HID Devices.
-   * <br>
-   * This function returns a linked list of all the HID devices attached to the system which match vendor_id and product_id.
-   * <br>
-   * If vendor_id is set to 0 then any vendor matches. If product_id is set to 0 then any product matches.
-   * <br>
-   * If vendor_id and product_id are both set to 0, then all HID devices will be returned.
-   *
-   * @param vendor_id  The vendor ID
-   * @param product_id The product ID
-   * @return A linked list of all discovered matching devices
-   */
-  HidDeviceInfoStructure hid_enumerate(short vendor_id, short product_id);
+    /**
+     * Enumerates the current HID Devices.
+     * <p>
+     * This function returns a linked list of all HID devices currently
+     * attached to the system that match the given vendor ID and product ID.
+     * <p>
+     * If the vendor ID is zero, then any vendor will match. If the product
+     * ID is zero, then any product will match. If both are set to zero, then
+     * all HID devices will be returned.
+     *
+     * @param vendor_id  The vendor ID.
+     * @param product_id The product ID.
+     * @return A linked list of all discovered matching devices.
+     */
+    @NotNull HidDeviceInfoStructure hid_enumerate(
+            @Range(from = 0x0000, to = 0xFFFF) short vendor_id,
+            @Range(from = 0x0000, to = 0xFFFF) short product_id
+    );
 
-  /**
-   * Free an enumeration linked list
-   *
-   * @param devs The device information pointer
-   */
-  void hid_free_enumeration(Pointer devs);
+    /**
+     * Frees an enumeration.
+     *
+     * @param device The device information pointer.
+     */
+    void hid_free_enumeration(@NotNull Pointer device);
 
-  /**
-   * Open a HID device by its path name.
-   * <br>
-   * The path name be determined by calling hid_enumerate(), or a platform-specific path name can be used (eg: "/dev/hidraw0" on Linux).
-   *
-   * @param path The path name
-   * @return The pointer if successful or null
-   */
-  Pointer hid_open_path(String path);
+    /**
+     * Opens an HID device by its path name.
+     * <p>
+     * The path name can be determined by calling {@code hid_enumerate()}.
+     * A platform specific path name (such as "/dev/hidraw0" on Linux) can
+     * also be used.
+     *
+     * @param path The path name.
+     * @return A pointer to the device on success, {@code null}
+     * on failure.
+     */
+    @Nullable Pointer hid_open_path(@NotNull String path);
 
-  /**
-   * Get version of hidapi library
-   *
-   * @return Version in major.minor.patch format
-   */
-  String hid_version_str();
+    /**
+     * Returns the current version of the HID API library.
+     *
+     * @return The current version in "major.minor.patch" format.
+     */
+    @NotNull String hid_version_str();
+
 }
