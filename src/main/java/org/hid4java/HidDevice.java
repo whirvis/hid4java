@@ -35,6 +35,8 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Objects;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Represents an HID device.
@@ -44,12 +46,11 @@ import java.util.Objects;
 @SuppressWarnings("unused")
 public class HidDevice implements Closeable {
 
-    /* TODO: add locks for getters, setters, read, write, etc. */
-
     private static final int INPUT_REPORT_LENGTH = 64;
 
     private final @NotNull HidDeviceManager manager;
     private @Nullable HidDeviceStructure device;
+    private final @NotNull Lock deviceLock;
 
     private final @NotNull String path;
     private final int vendorId;
@@ -71,12 +72,13 @@ public class HidDevice implements Closeable {
      * in this regard.
      */
     private @Nullable Thread dataReadThread;
+    private final Lock dataReadLock;
 
     HidDevice(@NotNull HidDeviceInfoStructure info,
               @NotNull HidDeviceManager manager,
               @NotNull HidServicesSpecification specs) {
         this.manager = manager;
-        this.device = null;
+        this.deviceLock = new ReentrantLock();
 
         /*
          * Cache these, because the structure this information comes from
@@ -102,7 +104,7 @@ public class HidDevice implements Closeable {
 
         this.autoDataRead = specs.isAutoDataRead();
         this.dataReadIntervalMs = specs.getDataReadIntervalMs();
-        this.dataReadThread = null;
+        this.dataReadLock = new ReentrantLock();
     }
 
     /**
@@ -205,34 +207,47 @@ public class HidDevice implements Closeable {
         return this.interfaceNumber;
     }
 
-    /* TODO: use locks instead of synchronized */
-    private synchronized void startDataReadThread() {
-        if (dataReadThread != null) {
-            return; /* thread is already running */
-        }
+    private void startDataReadThread() {
+        dataReadLock.lock();
+        try {
+            if (dataReadThread != null) {
+                return; /* thread is already running */
+            }
 
-        /* TODO: Won't the thread do this? */
-        this.dataRead();
+            /* TODO: won't the thread do this? */
+            this.dataRead();
 
-        Thread dataReadThread = new DataReadThread(this);
-        dataReadThread.setDaemon(true);
-        dataReadThread.setName("hid4java data reader");
-        dataReadThread.start();
+            Thread dataReadThread = new DataReadThread(this);
+            dataReadThread.setDaemon(true);
+            dataReadThread.setName("hid4java data reader");
+            dataReadThread.start();
 
-        this.dataReadThread = dataReadThread;
-    }
-
-    /* TODO: use locks instead of synchronized */
-    private synchronized void stopDataReadThread() {
-        if (dataReadThread != null) {
-            dataReadThread.interrupt();
+            this.dataReadThread = dataReadThread;
+        } finally {
+            dataReadLock.unlock();
         }
     }
 
-    /* TODO: use locks instead of synchronized */
-    private synchronized void dataRead() {
-        byte[] data = this.readAll(100);
-        manager.onDeviceDataReceived(this, data);
+    private void stopDataReadThread() {
+        dataReadLock.lock();
+        try {
+            if (dataReadThread != null) {
+                dataReadThread.interrupt();
+                this.dataReadThread = null;
+            }
+        } finally {
+            dataReadLock.unlock();
+        }
+    }
+
+    private void dataRead() {
+        dataReadLock.lock();
+        try {
+            byte[] data = this.readAll(100);
+            manager.onDeviceDataReceived(this, data);
+        } finally {
+            dataReadLock.unlock();
+        }
     }
 
     private void requireOpen() {
@@ -249,7 +264,12 @@ public class HidDevice implements Closeable {
      * @since 0.1.0
      */
     public boolean isOpen() {
-        return this.device != null;
+        deviceLock.lock();
+        try {
+            return this.device != null;
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -260,17 +280,22 @@ public class HidDevice implements Closeable {
      * @since 0.1.0
      */
     public boolean open() {
-        HidDeviceStructure hidDeviceStructure = HidApi.open(path);
-        if (hidDeviceStructure == null) {
-            return false;
-        }
+        deviceLock.lock();
+        try {
+            HidDeviceStructure device = HidApi.open(path);
+            if (device == null) {
+                return false;
+            }
 
-        this.device = hidDeviceStructure;
-        if (autoDataRead) {
-            this.startDataReadThread();
-        }
+            this.device = device;
+            if (autoDataRead) {
+                this.startDataReadThread();
+            }
 
-        return true;
+            return true;
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -291,9 +316,14 @@ public class HidDevice implements Closeable {
      * @since 0.1.0
      */
     public boolean setNonBlocking(boolean nonBlocking) {
-        this.requireOpen();
-        int result = HidApi.setNonBlocking(device, nonBlocking);
-        return result == 0; /* 0 == success, -1 == failure */
+        deviceLock.lock();
+        try {
+            this.requireOpen();
+            int result = HidApi.setNonBlocking(device, nonBlocking);
+            return result == 0; /* 0 == success, -1 == failure */
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -313,9 +343,14 @@ public class HidDevice implements Closeable {
      */
     @Range(from = -1L, to = Integer.MAX_VALUE)
     public int read(byte @NotNull [] buffer) {
-        Objects.requireNonNull(buffer, "buffer cannot be null");
-        this.requireOpen();
-        return HidApi.read(device, buffer);
+        deviceLock.lock();
+        try {
+            Objects.requireNonNull(buffer, "buffer cannot be null");
+            this.requireOpen();
+            return HidApi.read(device, buffer);
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -339,9 +374,14 @@ public class HidDevice implements Closeable {
             byte @NotNull [] buffer,
             @Range(from = -1L, to = Long.MAX_VALUE) long timeoutMs) {
         Objects.requireNonNull(buffer, "buffer cannot be null");
-        this.requireOpen();
-        /* TODO: handle down-casting from long to int */
-        return HidApi.read(device, buffer, (int) timeoutMs);
+        deviceLock.lock();
+        try {
+            this.requireOpen();
+            /* TODO: handle down-casting from long to int */
+            return HidApi.read(device, buffer, (int) timeoutMs);
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -362,11 +402,16 @@ public class HidDevice implements Closeable {
     public byte @NotNull [] read(
             @Range(from = 0L, to = Integer.MAX_VALUE) int amountToRead,
             @Range(from = -1L, to = Integer.MAX_VALUE) long timeoutMs) {
-        this.requireOpen();
-        byte[] buffer = new byte[amountToRead];
-        /* TODO: handle down-casting from long to int */
-        int read = HidApi.read(device, buffer, (int) timeoutMs);
-        return shorten(buffer, read);
+        deviceLock.lock();
+        try {
+            this.requireOpen();
+            byte[] buffer = new byte[amountToRead];
+            /* TODO: handle down-casting from long to int */
+            int read = HidApi.read(device, buffer, (int) timeoutMs);
+            return shorten(buffer, read);
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -384,10 +429,15 @@ public class HidDevice implements Closeable {
      */
     public byte @NotNull [] read(
             @Range(from = 0L, to = Integer.MAX_VALUE) int amountToRead) {
-        this.requireOpen();
-        byte[] buffer = new byte[amountToRead];
-        int read = HidApi.read(device, buffer);
-        return shorten(buffer, read);
+        deviceLock.lock();
+        try {
+            this.requireOpen();
+            byte[] buffer = new byte[amountToRead];
+            int read = HidApi.read(device, buffer);
+            return shorten(buffer, read);
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -403,25 +453,16 @@ public class HidDevice implements Closeable {
      * @since 0.1.0
      */
     public byte @NotNull [] read() {
-        /* TODO: this feels like a waste of memory, especially in a loop */
-        return this.read(INPUT_REPORT_LENGTH, 1000L);
+        deviceLock.lock();
+        try {
+            /* TODO: this feels like a waste of memory, especially in a loop */
+            return this.read(INPUT_REPORT_LENGTH, 1000L);
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
-    /**
-     * Reads as many input reports from the device as possible with
-     * a timeout.
-     * <p>
-     * <b>Note:</b> The timeout is used for {@code hid_read()}.
-     * The first read call that exceeds the timeout will have the
-     * function return.
-     *
-     * @param timeoutMs The timeout in milliseconds, or {@code -1}
-     *                  to wait indefinitely.
-     * @return The data read from the device.
-     * @throws IllegalStateException If the device is not open.
-     * @since 0.8.0
-     */
-    public byte @NotNull [] readAll(
+    private byte @NotNull [] readAllNoLock(
             @Range(from = -1L, to = Long.MAX_VALUE) long timeoutMs) {
         this.requireOpen();
 
@@ -449,26 +490,31 @@ public class HidDevice implements Closeable {
     }
 
     /**
-     * Writes an output report to the device.
+     * Reads as many input reports from the device as possible with
+     * a timeout.
      * <p>
-     * This will send the data to the first OUT endpoint, if one exists.
-     * If it does not, it will send the data through the control endpoint
-     * (endpoint 0).
+     * <b>Note:</b> The timeout is used for {@code hid_read()}.
+     * The first read call that exceeds the timeout will have the
+     * function return.
      *
-     * @param data         The data to send.
-     * @param packetLength The number of bytes to send, <b>not including
-     *                     the report ID.</b>
-     * @param reportId     The report ID. For devices that only support
-     *                     a single report, use {@code 0x00}.
-     * @param applyPadding {@code true} if padding should be applied to
-     *                     the data, {@code false} otherwise.
-     * @return The number of bytes written, {@code -1} on error.
-     * @throws NullPointerException     If {@code buffer} is {@code null}.
-     * @throws IllegalArgumentException If {@code packetLength} is negative.
-     * @throws IllegalStateException    If the device is not open.
+     * @param timeoutMs The timeout in milliseconds, or {@code -1}
+     *                  to wait indefinitely.
+     * @return The data read from the device.
+     * @throws IllegalStateException If the device is not open.
      * @since 0.8.0
      */
-    public int write(
+    public byte @NotNull [] readAll(
+            @Range(from = -1L, to = Long.MAX_VALUE) long timeoutMs) {
+        deviceLock.lock();
+        try {
+            return this.readAllNoLock(timeoutMs);
+        } finally {
+            deviceLock.unlock();
+        }
+    }
+
+    @Range(from = -1L, to = Integer.MAX_VALUE)
+    private int writeNoLock(
             byte @NotNull [] data,
             @Range(from = 0, to = Integer.MAX_VALUE) int packetLength,
             @Range(from = 0x00, to = 0xFF) byte reportId,
@@ -507,12 +553,48 @@ public class HidDevice implements Closeable {
      *                     the report ID.</b>
      * @param reportId     The report ID. For devices that only support
      *                     a single report, use {@code 0x00}.
+     * @param applyPadding {@code true} if padding should be applied to
+     *                     the data, {@code false} otherwise.
+     * @return The number of bytes written, {@code -1} on error.
+     * @throws NullPointerException     If {@code buffer} is {@code null}.
+     * @throws IllegalArgumentException If {@code packetLength} is negative.
+     * @throws IllegalStateException    If the device is not open.
+     * @since 0.8.0
+     */
+    @Range(from = -1L, to = Integer.MAX_VALUE)
+    public int write(
+            byte @NotNull [] data,
+            @Range(from = 0, to = Integer.MAX_VALUE) int packetLength,
+            @Range(from = 0x00, to = 0xFF) byte reportId,
+            boolean applyPadding) {
+        deviceLock.lock();
+        try {
+            return this.writeNoLock(
+                    data, packetLength, reportId, applyPadding);
+        } finally {
+            deviceLock.unlock();
+        }
+    }
+
+    /**
+     * Writes an output report to the device.
+     * <p>
+     * This will send the data to the first OUT endpoint, if one exists.
+     * If it does not, it will send the data through the control endpoint
+     * (endpoint 0).
+     *
+     * @param data         The data to send.
+     * @param packetLength The number of bytes to send, <b>not including
+     *                     the report ID.</b>
+     * @param reportId     The report ID. For devices that only support
+     *                     a single report, use {@code 0x00}.
      * @return The number of bytes written, {@code -1} on error.
      * @throws NullPointerException     If {@code buffer} is {@code null}.
      * @throws IllegalArgumentException If {@code packetLength} is negative.
      * @throws IllegalStateException    If the device is not open.
      * @since 0.1.0
      */
+    @Range(from = -1L, to = Integer.MAX_VALUE)
     public int write(
             byte @NotNull [] data,
             @Range(from = 0, to = Integer.MAX_VALUE) int packetLength,
@@ -536,8 +618,13 @@ public class HidDevice implements Closeable {
             byte @NotNull [] buffer,
             @Range(from = 0x00, to = 0xFF) byte reportId) {
         Objects.requireNonNull(buffer, "buffer cannot be null");
-        this.requireOpen();
-        return HidApi.getFeatureReport(device, buffer, reportId);
+        deviceLock.lock();
+        try {
+            this.requireOpen();
+            return HidApi.getFeatureReport(device, buffer, reportId);
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -559,8 +646,13 @@ public class HidDevice implements Closeable {
             byte @NotNull [] data,
             @Range(from = 0x00, to = 0xFF) byte reportId) {
         Objects.requireNonNull(data, "data cannot be null");
-        this.requireOpen();
-        return HidApi.sendFeatureReport(device, data, reportId);
+        deviceLock.lock();
+        try {
+            this.requireOpen();
+            return HidApi.sendFeatureReport(device, data, reportId);
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -574,8 +666,13 @@ public class HidDevice implements Closeable {
      */
     public @Nullable String getIndexedString(
             @Range(from = 0L, to = Integer.MAX_VALUE) int index) {
-        this.requireOpen();
-        return HidApi.getIndexedString(device, index);
+        deviceLock.lock();
+        try {
+            this.requireOpen();
+            return HidApi.getIndexedString(device, index);
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -589,9 +686,14 @@ public class HidDevice implements Closeable {
      */
     public boolean getReportDescriptor(byte @NotNull [] buffer) {
         Objects.requireNonNull(buffer, "buffer cannot be null");
-        this.requireOpen();
-        int result = HidApi.getReportDescriptor(device, buffer, buffer.length);
-        return result == 0; /* 0 == success, -1 == failure */
+        deviceLock.lock();
+        try {
+            this.requireOpen();
+            int result = HidApi.getReportDescriptor(device, buffer, buffer.length);
+            return result == 0; /* 0 == success, -1 == failure */
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -601,7 +703,12 @@ public class HidDevice implements Closeable {
      * @since 0.1.0
      */
     public @Nullable String getLastErrorMessage() {
-        return HidApi.getLastErrorMessage(device);
+        deviceLock.lock();
+        try {
+            return HidApi.getLastErrorMessage(device);
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     /**
@@ -632,18 +739,28 @@ public class HidDevice implements Closeable {
      * @since 0.8.0
      */
     public boolean isClosed() {
-        return this.device == null;
+        deviceLock.lock();
+        try {
+            return this.device == null;
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     @Override
     public void close() {
-        if (this.isClosed()) {
-            return; /* nothing to do */
-        }
+        deviceLock.lock();
+        try {
+            if (this.isClosed()) {
+                return; /* nothing to do */
+            }
 
-        this.stopDataReadThread();
-        HidApi.close(device);
-        this.device = null;
+            this.stopDataReadThread();
+            HidApi.close(device);
+            this.device = null;
+        } finally {
+            deviceLock.unlock();
+        }
     }
 
     @Override
