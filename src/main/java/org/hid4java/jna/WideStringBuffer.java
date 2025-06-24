@@ -37,7 +37,7 @@ import java.util.List;
  */
 public class WideStringBuffer extends Structure implements Structure.ByReference {
 
-    public byte @Nullable [] buffer;
+    public byte[] buffer;
 
     /**
      * Constructs a zeroed-out buffer containing {@code wchar_t}
