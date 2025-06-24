@@ -125,8 +125,7 @@ public class HidServicesListenerList implements Iterable<HidServicesListener> {
     private void fireHidEvent(
             @NotNull HidServicesEvent event,
             @NotNull BiConsumer<@NotNull HidServicesListener,
-                    @NotNull HidServicesEvent> callback
-    ) {
+                    @NotNull HidServicesEvent> callback) {
         /*
          * We use a copy to make sure no concurrent modifications occur while
          * processing an event. Even if we obtain a lock to process the events,

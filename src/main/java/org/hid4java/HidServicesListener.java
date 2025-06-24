@@ -91,8 +91,7 @@ public interface HidServicesListener extends EventListener {
     @SuppressWarnings({"unused", "CallToPrintStackTrace"})
     default void hidListenerException(
             @NotNull HidServicesEvent event,
-            @NotNull Throwable cause
-    ) {
+            @NotNull Throwable cause) {
         /* TODO: more robust logging */
         cause.printStackTrace();
     }
