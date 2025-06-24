@@ -26,10 +26,7 @@ package org.hid4java;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -42,7 +39,7 @@ import java.util.function.BiConsumer;
  *
  * @since 0.0.1
  */
-public class HidServicesListenerList {
+public class HidServicesListenerList implements Iterable<HidServicesListener> {
 
     private final List<HidServicesListener> listeners;
     private final ReadWriteLock listenersLock;
@@ -61,6 +58,7 @@ public class HidServicesListenerList {
      * Returns an unmodifiable view of the listeners.
      *
      * @return An unmodifiable view of the listeners.
+     * @see #iterator()
      */
     public final @NotNull List<HidServicesListener> getListeners() {
         return Collections.unmodifiableList(listeners);
@@ -208,6 +206,21 @@ public class HidServicesListenerList {
             HidServicesEvent event = new HidServicesEvent(hidDevice, data);
             this.fireHidEvent(event, HidServicesListener::hidDataReceived);
         });
+    }
+
+    /**
+     * Returns an iterator over the elements in this list.
+     * <p>
+     * <b>Note:</b> The returned iterator uses a copy of the underlying
+     * listeners list at the time of invocation. A such, odifications to
+     * the iterator will have no effect.
+     *
+     * @return an iterator over the elements in this list.
+     * @see #getListeners()
+     */
+    @Override
+    public @NotNull Iterator<HidServicesListener> iterator() {
+        return this.copyListeners().iterator();
     }
 
     private static @NotNull Thread
