@@ -28,8 +28,8 @@ import org.hid4java.jna.HidDeviceInfoStructure;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Manager which provides access to the underlying HID API library, device
@@ -42,7 +42,7 @@ class HidDeviceManager {
     private final HidServicesListenerList listeners;
     private final HidServicesSpecification specs;
     private final Map<String, HidDevice> attachedDevices;
-    private final ReadWriteLock lock;
+    private final Lock managerLock;
 
     private Thread scanThread;
 
@@ -52,7 +52,7 @@ class HidDeviceManager {
         this.listeners = listeners;
         this.specs = specs;
         this.attachedDevices = new HashMap<>();
-        this.lock = new ReentrantReadWriteLock();
+        this.managerLock = new ReentrantLock();
 
         /* attempt to initialize immediately */
         try {
@@ -67,18 +67,18 @@ class HidDeviceManager {
         if (dataReceived.length == 0) {
             return; /* don't bother with obtaining a lock */
         }
-        lock.writeLock().lock();
+        managerLock.lock();
         try {
             listeners.fireHidDataReceived(hidDevice, dataReceived);
         } finally {
-            lock.writeLock().unlock();
+            managerLock.unlock();
         }
     }
 
     void onDeviceWrite() {
-        lock.writeLock().lock();
+        managerLock.lock();
         try {
-            if (!this.isScanningNoLock() || specs.getScanMode() !=
+            if (!this.isScanning() || specs.getScanMode() !=
                     ScanMode.SCAN_AT_FIXED_INTERVAL_WITH_PAUSE_AFTER_WRITE) {
                 return; /* nothing to do */
             }
@@ -87,7 +87,7 @@ class HidDeviceManager {
             this.stopScanThread();
             this.configureScanThread();
         } finally {
-            lock.writeLock().unlock();
+            managerLock.unlock();
         }
     }
 
@@ -121,10 +121,6 @@ class HidDeviceManager {
         return devices;
     }
 
-    private boolean isScanningNoLock() {
-        return scanThread != null && scanThread.isAlive();
-    }
-
     /**
      * Returns if the scan thread is running.
      *
@@ -132,11 +128,11 @@ class HidDeviceManager {
      * {@code false} otherwise.
      */
     public boolean isScanning() {
-        lock.readLock().lock();
+        managerLock.lock();
         try {
-            return this.isScanningNoLock();
+            return scanThread != null && scanThread.isAlive();
         } finally {
-            lock.readLock().unlock();
+            managerLock.unlock();
         }
     }
 
@@ -174,19 +170,19 @@ class HidDeviceManager {
      * This will fire device attach/detach events as appropriate.
      */
     public void scan() {
-        lock.writeLock().lock();
+        managerLock.lock();
         try {
             this.scanNoLock();
         } finally {
-            lock.writeLock().unlock();
+            managerLock.unlock();
         }
     }
 
 
     private void configureScanThread() {
-        lock.writeLock().lock();
+        managerLock.lock();
         try {
-            if (this.isScanningNoLock()) {
+            if (this.isScanning()) {
                 this.stopScanThread();
             }
 
@@ -197,14 +193,14 @@ class HidDeviceManager {
 
             this.scanThread = scanThread;
         } finally {
-            lock.writeLock().unlock();
+            managerLock.unlock();
         }
     }
 
     private void stopScanThread() {
-        lock.writeLock().lock();
+        managerLock.lock();
         try {
-            if (!this.isScanningNoLock()) {
+            if (!this.isScanning()) {
                 return; /* nothing to do */
             }
 
@@ -220,7 +216,7 @@ class HidDeviceManager {
                 /* ignore and continue */
             }
         } finally {
-            lock.writeLock().unlock();
+            managerLock.unlock();
         }
     }
 
@@ -235,9 +231,9 @@ class HidDeviceManager {
      * @throws HidException If an HID error occurs.
      */
     public void start() {
-        lock.writeLock().lock();
+        managerLock.lock();
         try {
-            if (this.isScanningNoLock()) {
+            if (this.isScanning()) {
                 return; /* manager already started */
             }
 
@@ -245,7 +241,7 @@ class HidDeviceManager {
             this.scan();
             this.configureScanThread();
         } finally {
-            lock.writeLock().unlock();
+            managerLock.unlock();
         }
     }
 
@@ -255,13 +251,13 @@ class HidDeviceManager {
      * @throws HidException If an HID error occurs.
      */
     public void stop() {
-        lock.writeLock().lock();
+        managerLock.lock();
         try {
             this.stopScanThread();
             attachedDevices.values().forEach(HidDevice::close);
             attachedDevices.clear();
         } finally {
-            lock.writeLock().unlock();
+            managerLock.unlock();
         }
     }
 
