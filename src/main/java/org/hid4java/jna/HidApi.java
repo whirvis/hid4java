@@ -169,8 +169,8 @@ public class HidApi {
      * @throws NullPointerException  If {@code path} is {@code null}.
      * @throws IllegalStateException If the HID API is not initialized.
      */
-    public static @Nullable HidDeviceStructure
-    open(@NotNull String path) {
+    public static @Nullable HidDeviceStructure open(
+            @NotNull String path) {
         Objects.requireNonNull(path, "path cannot be null");
 
         Pointer ptr;
@@ -403,6 +403,7 @@ public class HidApi {
      *                    {@code false} to disable non-blocking.
      * @return {@code 0} on success, {@code -1} on error.
      */
+    @Range(from = -1, to = Integer.MAX_VALUE)
     public static int setNonBlocking(
             @Nullable HidDeviceStructure device,
             boolean nonBlocking) {
@@ -433,6 +434,7 @@ public class HidApi {
      * no data to be read and the handle is in non-blocking mode, {@code 0}
      * is returned immediately.
      */
+    @Range(from = -1, to = Integer.MAX_VALUE)
     public static int read(
             @Nullable HidDeviceStructure device,
             byte @Nullable [] buffer) {
@@ -447,14 +449,25 @@ public class HidApi {
             WideStringBuffer wStr = new WideStringBuffer(buffer);
             int bytesRead = hidApi.hid_read(
                     device.ptr, wStr, buffer.length);
-            if (bytesRead > 0) {
-                logTraffic(wStr, false);
-            }
+            logTraffic(wStr, false);
 
             return bytesRead;
         } finally {
             HID_API_LOCK.unlock();
         }
+    }
+
+    @Range(from = -1, to = Integer.MAX_VALUE)
+    private static int read(
+            @NotNull HidApiLibrary hidApi,
+            @NotNull HidDeviceStructure device,
+            byte @NotNull [] buffer,
+            @Range(from = -1L, to = Integer.MAX_VALUE) int timeoutMs) {
+        WideStringBuffer wStr = new WideStringBuffer(buffer);
+        int numBytes = hidApi.hid_read_timeout(device.ptr,
+                wStr, buffer.length, timeoutMs);
+        logTraffic(wStr, false);
+        return numBytes;
     }
 
     /**
@@ -471,32 +484,44 @@ public class HidApi {
      * @return The number of bytes read, {@code -1} on error. If there is
      * no data to be read within the timeout, {@code 0} is returned.
      */
+    @Range(from = -1, to = Integer.MAX_VALUE)
     public static int read(
             @Nullable HidDeviceStructure device,
             byte @Nullable [] buffer,
-            @Range(from = 0L, to = Long.MAX_VALUE) long timeoutMs
-    ) {
+            @Range(from = -1L, to = Long.MAX_VALUE) long timeoutMs) {
         if (device == null || buffer == null) {
-            return DEVICE_ERROR_CODE;
+            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
         }
 
         HID_API_LOCK.lock();
         try {
             HidApiLibrary hidApi = requireInit();
 
-            /* TODO: handle down-casting from long to int */
-            WideStringBuffer wStr = new WideStringBuffer(buffer);
-            int numBytes = hidApi.hid_read_timeout(device.ptr,
-                    wStr, buffer.length, (int) timeoutMs);
-            if (numBytes > 0) {
-                logTraffic(wStr, false);
+            /* wait indefinitely or no extra logic needed */
+            if (timeoutMs <= Integer.MAX_VALUE) {
+                return read(hidApi, device, buffer, (int) timeoutMs);
             }
 
-            return numBytes;
+            long remainingTimeoutMs = timeoutMs;
+            while (remainingTimeoutMs > 0) {
+                int timeoutMsChunk = (int) Math.min(
+                        Integer.MAX_VALUE, remainingTimeoutMs);
+
+                int numBytes = read(
+                        hidApi, device, buffer, timeoutMsChunk);
+                if (numBytes < 0) {
+                    return numBytes; /* error occurred */
+                } else if (numBytes > 0) {
+                    return numBytes; /* data received */
+                }
+
+                remainingTimeoutMs -= timeoutMsChunk;
+            }
+
+            return 0; /* no data received within timeout */
         } finally {
             HID_API_LOCK.unlock();
         }
-
     }
 
     /**
@@ -507,12 +532,13 @@ public class HidApi {
      * @param reportId The ID of the report to read.
      * @return The number of bytes read, {@code -1} on error.
      */
+    @Range(from = -1, to = Integer.MAX_VALUE)
     public static int getFeatureReport(
             @Nullable HidDeviceStructure device,
             byte @Nullable [] buffer,
             byte reportId) {
         if (device == null || buffer == null) {
-            return DEVICE_ERROR_CODE;
+            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
         }
 
         HID_API_LOCK.lock();
@@ -555,12 +581,13 @@ public class HidApi {
      * @param reportId The ID of the report to send.
      * @return The number of bytes written, {@code -1} on error.
      */
+    @Range(from = -1, to = Integer.MAX_VALUE)
     public static int sendFeatureReport(
             @Nullable HidDeviceStructure device,
             byte @Nullable [] data,
             byte reportId) {
         if (device == null || data == null) {
-            return DEVICE_ERROR_CODE;
+            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
         }
 
         HID_API_LOCK.lock();
@@ -600,13 +627,14 @@ public class HidApi {
      *                 only support a single report, use {@code 0x00}.
      * @return The number of bytes written, {@code -1} on error.
      */
+    @Range(from = -1, to = Integer.MAX_VALUE)
     public static int write(
             @Nullable HidDeviceStructure device,
             byte @Nullable [] data,
             @Range(from = 0, to = Integer.MAX_VALUE) int length,
             byte reportId) {
         if (device == null || data == null) {
-            return DEVICE_ERROR_CODE;
+            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
         } else if (length >= data.length) {
             String message = "length out of bounds for data";
             throw new IllegalArgumentException(message);
@@ -642,7 +670,7 @@ public class HidApi {
      * @param index  The index of the string to get.
      * @return The string at the given index, {@code null} on error.
      */
-    public static String getIndexedString(
+    public static @Nullable String getIndexedString(
             @Nullable HidDeviceStructure device,
             @Range(from = 0, to = Integer.MAX_VALUE) int index) {
         if (device == null) {
@@ -674,11 +702,11 @@ public class HidApi {
      * @param length The buffer length in multiples of {@code wchar_t}.
      * @return {@code 0} on success, {@code -1} on error.
      */
+    @Range(from = -1, to = Integer.MAX_VALUE)
     public static int getReportDescriptor(
             @Nullable HidDeviceStructure device,
             byte @Nullable [] buffer,
-            @Range(from = 0, to = Integer.MAX_VALUE) int length
-    ) {
+            @Range(from = 0, to = Integer.MAX_VALUE) int length) {
         if (device == null || buffer == null) {
             return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
         } else if (length >= buffer.length) {
@@ -734,8 +762,7 @@ public class HidApi {
 
     private static void logTraffic(
             @Nullable WideStringBuffer buffer,
-            boolean isWrite
-    ) {
+            boolean isWrite) {
         if (!HidApi.logTraffic) {
             return; /* don't bother with obtaining a lock */
         } else if (buffer == null || buffer.size() <= 0) {

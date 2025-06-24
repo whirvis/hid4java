@@ -377,8 +377,7 @@ public class HidDevice implements Closeable {
         deviceLock.lock();
         try {
             this.requireOpen();
-            /* TODO: handle down-casting from long to int */
-            return HidApi.read(device, buffer, (int) timeoutMs);
+            return HidApi.read(device, buffer, timeoutMs);
         } finally {
             deviceLock.unlock();
         }
@@ -406,8 +405,7 @@ public class HidDevice implements Closeable {
         try {
             this.requireOpen();
             byte[] buffer = new byte[amountToRead];
-            /* TODO: handle down-casting from long to int */
-            int read = HidApi.read(device, buffer, (int) timeoutMs);
+            int read = HidApi.read(device, buffer, timeoutMs);
             return shorten(buffer, read);
         } finally {
             deviceLock.unlock();
