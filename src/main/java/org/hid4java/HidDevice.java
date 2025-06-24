@@ -460,20 +460,20 @@ public class HidDevice implements Closeable {
         }
     }
 
-    private byte @NotNull [] readAllNoLock(
+    private @NotNull HidReadAllResult readAllNoLock(
             @Range(from = -1L, to = Long.MAX_VALUE) long timeoutMs) {
         this.requireOpen();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
+        int totalBytesRead = 0;
 
         byte[] buffer = new byte[INPUT_REPORT_LENGTH];
         while (true) {
             int bytesRead = read(buffer, timeoutMs);
-            if (bytesRead == 0) {
-                break; /* no more data */
-            } else if (bytesRead == -1) {
-                /* TODO: handle this! */
+            if (bytesRead == -1) {
                 break; /* error occurred */
+            } else if (bytesRead == 0) {
+                break; /* no more data */
             }
 
             try {
@@ -482,9 +482,12 @@ public class HidDevice implements Closeable {
                 /* this should never happen */
                 throw new RuntimeException(e);
             }
+
+            totalBytesRead += bytesRead;
         }
 
-        return output.toByteArray();
+        return new HidReadAllResult(
+                totalBytesRead, output.toByteArray());
     }
 
     /**
@@ -501,7 +504,7 @@ public class HidDevice implements Closeable {
      * @throws IllegalStateException If the device is not open.
      * @since 0.8.0
      */
-    public byte @NotNull [] readAll(
+    public @NotNull HidReadAllResult readAll(
             @Range(from = -1L, to = Long.MAX_VALUE) long timeoutMs) {
         deviceLock.lock();
         try {
