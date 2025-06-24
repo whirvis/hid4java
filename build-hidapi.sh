@@ -68,7 +68,8 @@ if [[ "$1" == "all" ]] || [[ "$1" == "darwin" ]] || [[ "$1" == "darwin-aarch64" 
       then
         echo -e "${yellow}WARNING: For production builds, please set \$SDKROOT and \$MACOSX_DEPLOYMENT_TARGET before building${plain}"
         echo -e "${yellow}Continuing with default values${plain}"
-        export SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+        SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+        export SDKROOT
         if [[ "$1" == "all" ]] || [[ "$1" == "darwin" ]] || [[ "$1" == "darwin-aarch64" ]]
           then
             # Build for darwin-aarch64 with minimum of OS Big Sur (2020)
@@ -96,8 +97,8 @@ if [[ ! -f $1 ]]
   then
     echo -e "${red}File '$1' was not found.${plain}"
   else
-    ls -la $1
-    file -b $1
+    ls -la "$1"
+    file -b "$1"
     echo -e "${green}---${plain}"
 fi
 }
@@ -110,7 +111,7 @@ echo -e "${green}---------------------------------------------------------------
 if [[ "$1" == "update" ]]
   then
     echo -e "${green}Updating Dockcross${plain}"
-    cd ${dockcrossDir} || exit
+    cd "${dockcrossDir}" || exit
     git checkout master
     git pull
 
@@ -118,19 +119,19 @@ if [[ "$1" == "update" ]]
 
     # 64-bit (Intel)
     echo -e "${green}Configuring Windows 64-bit${plain}"
-    docker run ${platform} --rm dockcross/windows-shared-x64 > ./dockcross-windows-shared-x64
+    docker run "${platform}" --rm dockcross/windows-shared-x64 > ./dockcross-windows-shared-x64
     chmod +x ./dockcross-windows-shared-x64
     mv ./dockcross-windows-shared-x64 /usr/local/bin
 
     # 32-bit (Intel)
     echo -e "${green}Configuring Windows 32-bit${plain}"
-    docker run ${platform} --rm dockcross/windows-shared-x86 > ./dockcross-windows-shared-x86
+    docker run "${platform}" --rm dockcross/windows-shared-x86 > ./dockcross-windows-shared-x86
     chmod +x ./dockcross-windows-shared-x86
     mv ./dockcross-windows-shared-x86 /usr/local/bin
 
     # 64-bit (ARM64)
     echo -e "${green}Configuring Windows 64-bit ARM64 (aarch64)${plain}"
-    docker run ${platform} --rm dockcross/windows-arm64 > ./dockcross-windows-arm64
+    docker run "${platform}" --rm dockcross/windows-arm64 > ./dockcross-windows-arm64
     chmod +x ./dockcross-windows-arm64
     mv ./dockcross-windows-arm64 /usr/local/bin
 
@@ -140,13 +141,13 @@ if [[ "$1" == "update" ]]
 
     # 64 bit (Intel)
     echo -e "${green}Configuring Linux 64-bit${plain}"
-    docker run ${platform} --rm dockcross/linux-x64 > ./dockcross-linux-x64
+    docker run "${platform}" --rm dockcross/linux-x64 > ./dockcross-linux-x64
     chmod +x ./dockcross-linux-x64
     mv ./dockcross-linux-x64 /usr/local/bin
 
     # 32 bit (Intel)
     echo -e "${green}Configuring Linux 32-bit${plain}"
-    docker run ${platform} --rm dockcross/linux-x86 > ./dockcross-linux-x86
+    docker run "${platform}" --rm dockcross/linux-x86 > ./dockcross-linux-x86
     chmod +x ./dockcross-linux-x86
     mv ./dockcross-linux-x86 /usr/local/bin
 
@@ -155,25 +156,25 @@ if [[ "$1" == "update" ]]
     # @Tresf
     # 32-bit ARMv5TE EABI "armel"
     echo -e "${green}Configuring ARMv5TE EABI 32-bit${plain}"
-    docker run ${platform} --rm dockcross/linux-armv5 > ./dockcross-linux-armv5
+    docker run "${platform}" --rm dockcross/linux-armv5 > ./dockcross-linux-armv5
     chmod +x ./dockcross-linux-armv5
     mv ./dockcross-linux-armv5 /usr/local/bin
 
     # 32-bit ARMv6 EABI
     echo -e "${green}Configuring ARMv6 EABI 32-bit${plain}"
-    docker run ${platform} --rm dockcross/linux-armv6 > ./dockcross-linux-armv6
+    docker run "${platform}" --rm dockcross/linux-armv6 > ./dockcross-linux-armv6
     chmod +x ./dockcross-linux-armv6
     mv ./dockcross-linux-armv6 /usr/local/bin
 
     # 32-bit ARMv7 hard float
     echo -e "${green}Configuring ARMv7 32-bit${plain}"
-    docker run ${platform} --rm dockcross/linux-armv7 > ./dockcross-linux-armv7
+    docker run "${platform}" --rm dockcross/linux-armv7 > ./dockcross-linux-armv7
     chmod +x ./dockcross-linux-armv7
     mv ./dockcross-linux-armv7 /usr/local/bin
 
     # 64-bit (arm64, aarch64)
     echo -e "${green}Configuring ARM 64-bit${plain}"
-    docker run ${platform} --rm dockcross/linux-arm64 > ./dockcross-linux-arm64
+    docker run "${platform}" --rm dockcross/linux-arm64 > ./dockcross-linux-arm64
     chmod +x ./dockcross-linux-arm64
     mv ./dockcross-linux-arm64 /usr/local/bin
 
@@ -188,7 +189,7 @@ if [[ "$1" == "update" ]]
 
     # HIDAPI latest release
     echo -e "${green}Updating HIDAPI${plain}"
-    cd ${hidapiDir} || exit
+    cd "${hidapiDir}" || exit
     git checkout master
     git pull
   else
@@ -197,7 +198,7 @@ fi
 echo -e "${green}------------------------------------------------------------------------${plain}"
 
 # Build in hidapi project directory
-cd ${hidapiDir} || exit
+cd "${hidapiDir}" || exit
 
 # Windows environments
 
@@ -208,12 +209,12 @@ if [[ "$1" == "all" ]] || [[ "$1" == "windows" ]] || [[ "$1" == "win32-x86-64" ]
     if ! dockcross-windows-shared-x64 bash -c 'sudo apt-get update && sudo apt-get --yes install libudev-dev libusb-1.0-0-dev && sudo ./bootstrap && sudo ./configure --host=x86_64-w64-mingw32 && sudo make';
       then
         echo -e "${red}Failed${plain} - Removing damaged targets"
-        rm ${hid4javaDir}/src/main/resources/win32-x86-64/hidapi.dll
+        rm "${hid4javaDir}"/src/main/resources/win32-x86-64/hidapi.dll
         exit
       else
         echo -e "${green}OK${plain}"
-        mkdir -p ${hid4javaDir}/src/main/resources/win32-x86-64
-        cp windows/.libs/libhidapi-0.dll ${hid4javaDir}/src/main/resources/win32-x86-64/hidapi.dll
+        mkdir -p "${hid4javaDir}"/src/main/resources/win32-x86-64
+        cp windows/.libs/libhidapi-0.dll "${hid4javaDir}"/src/main/resources/win32-x86-64/hidapi.dll
     fi
   else
     echo -e "${yellow}Skipping win32-x86-64${plain}"
@@ -227,12 +228,12 @@ if [[ "$1" == "all" ]] || [[ "$1" == "windows" ]] || [[ "$1" == "win32-aarch64" 
     if ! dockcross-windows-arm64 bash -c 'sudo apt-get update && sudo apt-get --yes install libudev-dev libusb-1.0-0-dev && sudo ./bootstrap && sudo ./configure --host=aarch64-w64-mingw32 && sudo make';
       then
         echo -e "${red}Failed${plain} - Removing damaged targets"
-        rm ${hid4javaDir}/src/main/resources/win32-aarch64/hidapi.dll
+        rm "${hid4javaDir}"/src/main/resources/win32-aarch64/hidapi.dll
         exit
       else
         echo -e "${green}OK${plain}"
-        mkdir -p ${hid4javaDir}/src/main/resources/win32-aarch64
-        cp windows/.libs/libhidapi-0.dll ${hid4javaDir}/src/main/resources/win32-aarch64/hidapi.dll
+        mkdir -p "${hid4javaDir}"/src/main/resources/win32-aarch64
+        cp windows/.libs/libhidapi-0.dll "${hid4javaDir}"/src/main/resources/win32-aarch64/hidapi.dll
     fi
   else
     echo -e "${yellow}Skipping win32-aarch64${plain}"
@@ -246,11 +247,11 @@ if [[ "$1" == "all" ]] || [[ "$1" == "windows" ]] || [[ "$1" == "win32-x86" ]]
     if ! dockcross-windows-shared-x86 bash -c 'sudo ./bootstrap && sudo ./configure --host=i686-w64-mingw32 && sudo make';
       then
         echo -e "${red}Failed${plain} - Removing damaged targets"
-        rm ${hid4javaDir}/src/main/resources/win32-x86/hidapi.dll
+        rm "${hid4javaDir}"/src/main/resources/win32-x86/hidapi.dll
       else
         echo -e "${green}OK${plain}"
-        mkdir -p ${hid4javaDir}/src/main/resources/win32-x86
-        cp windows/.libs/libhidapi-0.dll ${hid4javaDir}/src/main/resources/win32-x86/hidapi.dll
+        mkdir -p "${hid4javaDir}"/src/main/resources/win32-x86
+        cp windows/.libs/libhidapi-0.dll "${hid4javaDir}"/src/main/resources/win32-x86/hidapi.dll
     fi
   else
     echo -e "${yellow}Skipping win32-x86${plain}"
@@ -267,17 +268,17 @@ if [[ "$1" == "all" ]] || [[ "$1" == "linux" ]] || [[ "$1" == "linux-x86-64" ]]
     if ! dockcross-linux-x64 bash -c 'sudo apt-get update || sudo apt-get update && sudo apt-get --yes install libudev-dev libusb-1.0-0-dev && sudo ./bootstrap && sudo ./configure && sudo make';
       then
         echo -e "${red}Failed${plain} - Removing damaged targets"
-        rm ${hid4javaDir}/src/main/resources/linux-x86-64/libhidapi.so
-        rm ${hid4javaDir}/src/main/resources/linux-amd64/libhidapi.so
-        rm ${hid4javaDir}/src/main/resources/linux-x86-64/libhidapi-libusb.so
-        rm ${hid4javaDir}/src/main/resources/linux-amd64/libhidapi-libusb.so
+        rm "${hid4javaDir}"/src/main/resources/linux-x86-64/libhidapi.so
+        rm "${hid4javaDir}"/src/main/resources/linux-amd64/libhidapi.so
+        rm "${hid4javaDir}"/src/main/resources/linux-x86-64/libhidapi-libusb.so
+        rm "${hid4javaDir}"/src/main/resources/linux-amd64/libhidapi-libusb.so
       else
         echo -e "${green}OK${plain}"
-        mkdir -p ${hid4javaDir}/src/main/resources/linux-x86-64
-        cp linux/.libs/libhidapi-hidraw.so ${hid4javaDir}/src/main/resources/linux-x86-64/libhidapi.so
-        cp linux/.libs/libhidapi-hidraw.so ${hid4javaDir}/src/main/resources/linux-amd64/libhidapi.so
-        cp libusb/.libs/libhidapi-libusb.so ${hid4javaDir}/src/main/resources/linux-x86-64/libhidapi-libusb.so
-        cp libusb/.libs/libhidapi-libusb.so ${hid4javaDir}/src/main/resources/linux-amd64/libhidapi-libusb.so
+        mkdir -p "${hid4javaDir}"/src/main/resources/linux-x86-64
+        cp linux/.libs/libhidapi-hidraw.so "${hid4javaDir}"/src/main/resources/linux-x86-64/libhidapi.so
+        cp linux/.libs/libhidapi-hidraw.so "${hid4javaDir}"/src/main/resources/linux-amd64/libhidapi.so
+        cp libusb/.libs/libhidapi-libusb.so "${hid4javaDir}"/src/main/resources/linux-x86-64/libhidapi-libusb.so
+        cp libusb/.libs/libhidapi-libusb.so "${hid4javaDir}"/src/main/resources/linux-amd64/libhidapi-libusb.so
     fi
   else
     echo -e "${yellow}Skipping linux-x86-64${plain}"
@@ -291,13 +292,13 @@ if [[ "$1" == "all" ]] || [[ "$1" == "linux" ]] || [[ "$1" == "linux-x86" ]]
     if ! dockcross-linux-x86 bash -c 'sudo dpkg --add-architecture i386 && sudo apt-get update && sudo apt-get --yes install libudev-dev libusb-1.0-0-dev libudev-dev:i386 libusb-1.0-0-dev:i386 && sudo ./bootstrap && sudo ./configure && sudo make';
       then
         echo -e "${red}Failed${plain} - Removing damaged targets"
-        rm ${hid4javaDir}/src/main/resources/linux-x86/libhidapi.so
-        rm ${hid4javaDir}/src/main/resources/linux-x86/libhidapi-libusb.so
+        rm "${hid4javaDir}"/src/main/resources/linux-x86/libhidapi.so
+        rm "${hid4javaDir}"/src/main/resources/linux-x86/libhidapi-libusb.so
       else
         echo -e "${green}OK${plain}"
-        mkdir -p ${hid4javaDir}/src/main/resources/linux-x86
-        cp linux/.libs/libhidapi-hidraw.so ${hid4javaDir}/src/main/resources/linux-x86/libhidapi.so
-        cp libusb/.libs/libhidapi-libusb.so ${hid4javaDir}/src/main/resources/linux-x86/libhidapi-libusb.so
+        mkdir -p "${hid4javaDir}"/src/main/resources/linux-x86
+        cp linux/.libs/libhidapi-hidraw.so "${hid4javaDir}"/src/main/resources/linux-x86/libhidapi.so
+        cp libusb/.libs/libhidapi-libusb.so "${hid4javaDir}"/src/main/resources/linux-x86/libhidapi-libusb.so
     fi
   else
     echo -e "${yellow}Skipping linux-x86${plain}"
@@ -313,13 +314,13 @@ if [[ "$1" == "all" ]] || [[ "$1" == "linux" ]] || [[ "$1" == "linux-aarch64" ]]
     if ! dockcross-linux-arm64 bash -c 'sudo dpkg --add-architecture arm64 && sudo apt-get update && sudo apt-get --yes install gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libudev-dev:arm64 libusb-1.0-0-dev:arm64 && sudo ./bootstrap && sudo ./configure --host=aarch64-linux-gnu CC=aarch64-linux-gnu-gcc && sudo make';
       then
         echo -e "${red}Failed${plain} - Removing damaged targets"
-        rm ${hid4javaDir}/src/main/resources/linux-aarch64/libhidapi.so
-        rm ${hid4javaDir}/src/main/resources/linux-aarch64/libhidapi-libusb.so
+        rm "${hid4javaDir}"/src/main/resources/linux-aarch64/libhidapi.so
+        rm "${hid4javaDir}"/src/main/resources/linux-aarch64/libhidapi-libusb.so
       else
         echo -e "${green}OK${plain}"
-        mkdir -p ${hid4javaDir}/src/main/resources/linux-aarch64
-        cp linux/.libs/libhidapi-hidraw.so ${hid4javaDir}/src/main/resources/linux-aarch64/libhidapi.so
-        cp libusb/.libs/libhidapi-libusb.so ${hid4javaDir}/src/main/resources/linux-aarch64/libhidapi-libusb.so
+        mkdir -p "${hid4javaDir}"/src/main/resources/linux-aarch64
+        cp linux/.libs/libhidapi-hidraw.so "${hid4javaDir}"/src/main/resources/linux-aarch64/libhidapi.so
+        cp libusb/.libs/libhidapi-libusb.so "${hid4javaDir}"/src/main/resources/linux-aarch64/libhidapi-libusb.so
     fi
   else
     echo -e "${yellow}Skipping linux-aarch64${plain}"
@@ -357,13 +358,13 @@ if [[ "$1" == "all" ]] || [[ "$1" == "linux" ]] || [[ "$1" == "linux-armel" ]]
     if ! dockcross-linux-armv5 bash -c "$deps && sudo ./bootstrap && sudo ./configure --host=aarch64-unknown-linux-gnueabi && sudo make";
       then
         echo -e "${red}Failed${plain} - Removing damaged targets"
-        rm ${hid4javaDir}/src/main/resources/linux-armel/libhidapi.so
-        rm ${hid4javaDir}/src/main/resources/linux-armel/libhidapi-libusb.so
+        rm "${hid4javaDir}"/src/main/resources/linux-armel/libhidapi.so
+        rm "${hid4javaDir}"/src/main/resources/linux-armel/libhidapi-libusb.so
       else
         echo -e "${green}OK${plain}"
-        mkdir -p ${hid4javaDir}/src/main/resources/linux-armel
-        cp linux/.libs/libhidapi-hidraw.so ${hid4javaDir}/src/main/resources/linux-armel/libhidapi.so
-        cp libusb/.libs/libhidapi-libusb.so ${hid4javaDir}/src/main/resources/linux-armel/libhidapi-libusb.so
+        mkdir -p "${hid4javaDir}"/src/main/resources/linux-armel
+        cp linux/.libs/libhidapi-hidraw.so "${hid4javaDir}"/src/main/resources/linux-armel/libhidapi.so
+        cp libusb/.libs/libhidapi-libusb.so "${hid4javaDir}"/src/main/resources/linux-armel/libhidapi-libusb.so
     fi
   else
     echo -e "${yellow}Skipping linux-armel${plain}"
@@ -395,7 +396,7 @@ if [[ "$1" == "all" ]] || [[ "$1" == "linux" ]] || [[ "$1" == "linux-riscv64" ]]
     deps="$deps && echo 'deb [arch=$arch] http://deb.debian.org/debian sid main' | sudo tee -a /etc/apt/sources.list"
     deps="$deps && sudo apt-get update"
     deps="$deps && mkdir -p debs && pushd debs"
-    deps="$deps && for deb in "${debs[@]}"; do echo \"- Downloading \$deb...\" && apt-get download \$deb:$arch && ar x \$deb* && tar -xf data.tar.xz && rm -f \$deb*.deb ; done"
+    deps="$deps && for deb in \\"${debs[*]}\\"; do echo \"- Downloading \$deb...\" && apt-get download \$deb:$arch && ar x \$deb* && tar -xf data.tar.xz && rm -f \$deb*.deb ; done"
     deps="$deps && sudo cp -rf ./usr/* /usr/"
     deps="$deps && popd"
     deps="$deps && rm -rf debs"
@@ -405,13 +406,13 @@ if [[ "$1" == "all" ]] || [[ "$1" == "linux" ]] || [[ "$1" == "linux-riscv64" ]]
     if ! dockcross-linux-riscv64 bash -c "sudo $deps && sudo ./bootstrap && sudo ./configure --host=riscv64-unknown-linux-gnu && sudo make";
       then
         echo -e "${red}Failed${plain} - Removing damaged targets"
-        rm ${hid4javaDir}/src/main/resources/linux-riscv64/libhidapi.so
-        rm ${hid4javaDir}/src/main/resources/linux-riscv64/libhidapi-libusb.so
+        rm "${hid4javaDir}"/src/main/resources/linux-riscv64/libhidapi.so
+        rm "${hid4javaDir}"/src/main/resources/linux-riscv64/libhidapi-libusb.so
       else
         echo -e "${green}OK${plain}"
-        mkdir -p ${hid4javaDir}/src/main/resources/linux-riscv64
-        cp linux/.libs/libhidapi-hidraw.so ${hid4javaDir}/src/main/resources/linux-riscv64/libhidapi.so
-        cp libusb/.libs/libhidapi-libusb.so ${hid4javaDir}/src/main/resources/linux-riscv64/libhidapi-libusb.so
+        mkdir -p "${hid4javaDir}"/src/main/resources/linux-riscv64
+        cp linux/.libs/libhidapi-hidraw.so "${hid4javaDir}"/src/main/resources/linux-riscv64/libhidapi.so
+        cp libusb/.libs/libhidapi-libusb.so "${hid4javaDir}"/src/main/resources/linux-riscv64/libhidapi-libusb.so
     fi
   else
     echo -e "${yellow}Skipping linux-riscv64${plain}"
@@ -435,11 +436,11 @@ if [[ "$1" == "all" ]] || [[ "$1" == "darwin" ]] || [[ "$1" == "darwin-aarch64" 
         if ! make;
           then
             echo -e "${red}Failed${plain} - Removing damaged targets"
-            rm ${hid4javaDir}/src/main/resources/darwin-aarch64/libhidapi.dylib
+            rm "${hid4javaDir}"/src/main/resources/darwin-aarch64/libhidapi.dylib
           else
             echo -e "${green}OK${plain}"
-            mkdir -p ${hid4javaDir}/src/main/resources/darwin-aarch64
-            cp mac/.libs/libhidapi.0.dylib ${hid4javaDir}/src/main/resources/darwin-aarch64/libhidapi.dylib
+            mkdir -p "${hid4javaDir}"/src/main/resources/darwin-aarch64
+            cp mac/.libs/libhidapi.0.dylib "${hid4javaDir}"/src/main/resources/darwin-aarch64/libhidapi.dylib
         fi
     fi
 fi
@@ -460,11 +461,11 @@ if [[ "$1" == "all" ]] || [[ "$1" == "darwin" ]] || [[ "$1" == "darwin-x86-64" ]
         if ! make;
           then
             echo -e "${red}Failed${plain} - Removing damaged targets"
-            rm ${hid4javaDir}/src/main/resources/darwin-x86-64/libhidapi.dylib
+            rm "${hid4javaDir}"/src/main/resources/darwin-x86-64/libhidapi.dylib
           else
             echo -e "${green}OK${plain}"
-            mkdir -p ${hid4javaDir}/src/main/resources/darwin-x86-64
-            cp mac/.libs/libhidapi.0.dylib ${hid4javaDir}/src/main/resources/darwin-x86-64/libhidapi.dylib
+            mkdir -p "${hid4javaDir}"/src/main/resources/darwin-x86-64
+            cp mac/.libs/libhidapi.0.dylib "${hid4javaDir}"/src/main/resources/darwin-x86-64/libhidapi.dylib
         fi
     fi
   else
@@ -474,7 +475,7 @@ fi
 echo -e "${green}------------------------------------------------------------------------${plain}"
 
 # Report in hid4java project directory
-cd ${hid4javaDir} || exit
+cd "${hid4javaDir}" || exit
 
 # List all file info
 if [[ "$1" == "update" ]]
