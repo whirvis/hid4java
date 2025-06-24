@@ -318,8 +318,11 @@ public class HidApi {
             HidApiLibrary hidApi = requireInit();
             WideStringBuffer wStr =
                     new WideStringBuffer(WSTR_DEFAULT_LEN);
-            hidApi.hid_get_manufacturer_string(
+            int result = hidApi.hid_get_manufacturer_string(
                     device.ptr, wStr, WSTR_DEFAULT_LEN);
+            if (result == -1) {
+                return null; /* error occurred, no data */
+            }
             return wStr.toString();
         } finally {
             HID_API_LOCK.unlock();
@@ -344,8 +347,11 @@ public class HidApi {
             HidApiLibrary hidApi = requireInit();
             WideStringBuffer wStr =
                     new WideStringBuffer(WSTR_DEFAULT_LEN);
-            hidApi.hid_get_product_string(
+            int result = hidApi.hid_get_product_string(
                     device.ptr, wStr, WSTR_DEFAULT_LEN);
+            if (result == -1) {
+                return null; /* error occurred, no data */
+            }
             return wStr.toString();
         } finally {
             HID_API_LOCK.unlock();
@@ -370,8 +376,11 @@ public class HidApi {
             HidApiLibrary hidApi = requireInit();
             WideStringBuffer wStr =
                     new WideStringBuffer(WSTR_DEFAULT_LEN);
-            hidApi.hid_get_serial_number_string(
+            int result = hidApi.hid_get_serial_number_string(
                     device.ptr, wStr, WSTR_DEFAULT_LEN);
+            if (result == -1) {
+                return null; /* error occurred, no data */
+            }
             return wStr.toString();
         } finally {
             HID_API_LOCK.unlock();
