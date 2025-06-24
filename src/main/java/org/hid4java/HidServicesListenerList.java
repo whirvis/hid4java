@@ -133,7 +133,7 @@ public class HidServicesListenerList {
          * We use a copy to make sure no concurrent modifications occur while
          * processing an event. Even if we obtain a lock to process the events,
          * a listener removing itself (or adding another listener) could result
-         * in a deadlock.
+         * in a deadlock or a ConcurrentModificationException.
          */
         List<HidServicesListener> listeners = this.copyListeners();
 
