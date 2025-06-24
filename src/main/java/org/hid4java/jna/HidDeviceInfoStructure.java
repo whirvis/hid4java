@@ -156,16 +156,16 @@ public class HidDeviceInfoStructure
     @Override
     public @NotNull String toString() {
         return "HID device\n" +
-                String.format("path: %s\n", path) +
-                String.format("vendor_id: 0x%04x\n", vendor_id) +
-                String.format("product_id: 0x%04x\n", product_id) +
-                String.format("serial_number: %s\n", serial_number) +
-                String.format("release_number: %d\n", release_number) +
-                String.format("manufacturer_string: %s\n", manufacturer_string) +
-                String.format("product_string: %s\n", product_string) +
-                String.format("usage_page: %d\n", usage_page) +
-                String.format("usage: %d\n", usage) +
-                String.format("interface_number: %d", interface_number);
+                String.format("\tpath: %s\n", path) +
+                String.format("\tvendor_id: 0x%04x\n", vendor_id) +
+                String.format("\tproduct_id: 0x%04x\n", product_id) +
+                String.format("\tserial_number: %s\n", serial_number) +
+                String.format("\trelease_number: %d\n", release_number) +
+                String.format("\tmanufacturer_string: %s\n", manufacturer_string) +
+                String.format("\tproduct_string: %s\n", product_string) +
+                String.format("\tusage_page: %d\n", usage_page) +
+                String.format("\tusage: %d\n", usage) +
+                String.format("\tinterface_number: %d", interface_number);
     }
 
 }
