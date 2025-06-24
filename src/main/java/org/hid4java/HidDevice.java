@@ -292,7 +292,8 @@ public class HidDevice implements Closeable {
      */
     public boolean setNonBlocking(boolean nonBlocking) {
         this.requireOpen();
-        return HidApi.setNonBlocking(device, nonBlocking);
+        int result = HidApi.setNonBlocking(device, nonBlocking);
+        return result == 0; /* 0 == success, -1 == failure */
     }
 
     /**

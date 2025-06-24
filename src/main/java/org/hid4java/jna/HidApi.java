@@ -1,7 +1,7 @@
 /*
- * The MIT License (MIT)
+ * the MIT License (MIT)
  *
- * Copyright (c) 2014-2015 Gary Rowe
+ * Copyright (c) 2014-2025 Gary Rowe, "Whirvis" Trent Summerlin
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -10,7 +10,7 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
+ * the above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -20,499 +20,727 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
  */
-
 package org.hid4java.jna;
 
 import com.sun.jna.Platform;
 import com.sun.jna.Pointer;
 import com.sun.jna.WString;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Range;
+
+import java.util.Objects;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * JNA utility class to provide the following to low level operations:
- * <ul>
- * <li>Direct access to the HID API library through JNA</li>
- * </ul>
+ * JNA proxy to access the HID API library.
  *
  * @since 0.0.1
  */
 public class HidApi {
 
-  /**
-   * Default length for wide string buffer
-   */
-  private static final int WSTR_LEN = 512;
+    private static final int WSTR_DEFAULT_LEN = 512;
+    private static final int DEVICE_ERROR_CODE = -2;
 
-  /**
-   * Error message if device is not initialised
-   */
-  private static final String DEVICE_NULL = "Device not initialised";
+    /**
+     * Enables use of the LibUSB implementation of the HID API library when
+     * running on a Linux platform.
+     * <p>
+     * The default is raw HID, which enables Bluetooth devices but requires
+     * udev rules.
+     */
+    public static boolean useLibUsbVariantOnLinux = false;
 
-  /**
-   * Device error code
-   */
-  private static final int DEVICE_ERROR = -2;
+    /**
+     * Determines if all devices should be opened in exclusive mode when
+     * using the Darwin implementation of the HID API.
+     *
+     * @see DarwinHidApiLibrary#hid_darwin_set_open_exclusive(int)
+     */
+    public static boolean darwinOpenDevicesNonExclusive = false;
 
-  /**
-   * Enables use of the libusb variant of the hidapi native library when running on a Linux platform.
-   * <br>
-   * The default is hidraw which enables Bluetooth devices but requires udev rules.
-   */
-  public static boolean useLibUsbVariant = false;
+    /**
+     * Enables HID traffic logging assist debugging. This will show all
+     * bytes (including the report ID) that were are or received via HID
+     * API buffers.
+     * <p>
+     * This may present a security issue if left enabled in production,
+     * although a packet sniffer would see the same data.
+     */
+    public static boolean logTraffic = false;
 
-  /**
-   * When false - all devices will be opened in exclusive mode. (Default)
-   * When true - all devices will be opened in non-exclusive mode.
-   * <br>
-   * See {@link DarwinHidApiLibrary#hid_darwin_set_open_exclusive(int)} for more information.
-   */
-  public static boolean darwinOpenDevicesNonExclusive = false;
+    private static final Lock HID_API_LOCK = new ReentrantLock();
 
-  /**
-   * Enables HID traffic logging to stdout to assist debugging. This will show all bytes (including the extra report ID)
-   * that were sent or received via HIDAPI buffers. It does not log direct string calls (e.g. getEnumeratedString()).
-   * <br>
-   * Format is '&gt;' for host to device then '[count]' then hex bytes.
-   * <br>
-   * This may present a security issue if left enabled in production, although a packet sniffer would see the same data.
-   */
-  public static boolean logTraffic = false;
+    private static @Nullable HidApiLibrary hidApi;
 
-  /**
-   * The HID API library
-   */
-  private static HidApiLibrary hidApiLibrary;
+    /**
+     * Open the first HID device with the given vendor ID, product ID and
+     * optionally serial number.
+     *
+     * @param vendorId     The vendor ID.
+     * @param productId    The product ID.
+     * @param serialNumber The serial number, {@code null} for wildcard.
+     * @return The device structure, or {@code null} if not found.
+     * @throws IllegalArgumentException If the vendor ID or product ID do
+     *                                  not fit inside an unsigned short.
+     * @throws IllegalStateException    If the HID API is not initialized.
+     */
+    public static @Nullable HidDeviceStructure open(
+            @Range(from = 0x0000, to = 0xFFFF) int vendorId,
+            @Range(from = 0x0000, to = 0xFFFF) int productId,
+            @Nullable String serialNumber) {
+        requireUnsignedShort("vendorId", vendorId);
+        requireUnsignedShort("productId", productId);
 
-  /**
-   * Open a HID device using a Vendor ID (VID), Product ID (PID) and optionally a serial number
-   *
-   * @param vendor       The vendor ID
-   * @param product      The product ID
-   * @param serialNumber The serial number
-   * @return The device or null if not found
-   */
-  public static HidDeviceStructure open(int vendor, int product, String serialNumber) {
+        Pointer ptr;
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            ptr = hidApi.hid_open(
+                    (short) vendorId,
+                    (short) productId,
+                    serialNumber == null ? null : new WString(serialNumber)
+            );
+        } finally {
+            HID_API_LOCK.unlock();
+        }
 
-    // Attempt to open the device
-    Pointer p = hidApiLibrary.hid_open(
-      (short) vendor,
-      (short) product,
-      serialNumber == null ? null : new WString(serialNumber)
-    );
+        if (ptr == null) {
+            return null;
+        }
 
-    if (p != null) {
-      // Wrap the structure
-      return new HidDeviceStructure(p);
+        return new HidDeviceStructure(ptr);
     }
 
-    return null;
+    /**
+     * Initialises the HID API library. This must be called before any
+     * other API calls.
+     * <p>
+     * If the library is currently initialized, it will be re-initialized
+     * with the current parameters.
+     */
+    public static void init() {
+        HID_API_LOCK.lock();
+        try {
+            exit();
 
-  }
+            if (useLibUsbVariantOnLinux && Platform.isLinux()) {
+                hidApi = LibUsbHidApiLibrary.INSTANCE;
+            } else if (Platform.isMac()) {
+                hidApi = DarwinHidApiLibrary.INSTANCE;
+            } else {
+                hidApi = HidRawHidApiLibrary.INSTANCE;
+            }
 
-  /**
-   * Initialise the HID API library. Should always be called before using any other API calls.
-   */
-  public static void init() {
+            hidApi.hid_init();
 
-    if (useLibUsbVariant && Platform.isLinux()) {
-      hidApiLibrary = LibUsbHidApiLibrary.INSTANCE;
-    } else if (Platform.isMac()) {
-      hidApiLibrary = DarwinHidApiLibrary.INSTANCE;
-    } else {
-      hidApiLibrary = HidRawHidApiLibrary.INSTANCE;
+            if (hidApi instanceof DarwinHidApiLibrary) {
+                DarwinHidApiLibrary darwin = (DarwinHidApiLibrary) hidApi;
+                int nonExclusive = darwinOpenDevicesNonExclusive ? 0 : 1;
+                darwin.hid_darwin_set_open_exclusive(nonExclusive);
+            }
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    hidApiLibrary.hid_init();
-
-    if (hidApiLibrary instanceof DarwinHidApiLibrary) {
-      ((DarwinHidApiLibrary) hidApiLibrary).hid_darwin_set_open_exclusive(darwinOpenDevicesNonExclusive ? 0 : 1);
-    }
-  }
-
-  /**
-   * Finalise the HID API library
-   */
-  public static void exit() {
-    hidApiLibrary.hid_exit();
-  }
-
-  /**
-   * Open a HID device by its path name
-   *
-   * @param path The device path (e.g. "0003:0002:00")
-   * @return The device or null if not found
-   */
-  public static HidDeviceStructure open(String path) {
-    Pointer p = hidApiLibrary.hid_open_path(path);
-    return (p == null ? null : new HidDeviceStructure(p));
-  }
-
-  /**
-   * Close a HID device
-   *
-   * @param device The HID device structure
-   */
-  public static void close(HidDeviceStructure device) {
-
-    if (device != null) {
-      hidApiLibrary.hid_close(device.ptr);
+    /**
+     * De-initializes the HID API library.
+     */
+    public static void exit() {
+        HID_API_LOCK.lock();
+        try {
+            if (hidApi != null) {
+                hidApi.hid_exit();
+                hidApi = null;
+            }
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-  }
+    /**
+     * Opens an HID device by its path name.
+     *
+     * @param path The device path (e.g. {@code "0003:0002:00"})
+     * @return The device, or {@code null} if not found.
+     * @throws NullPointerException  If {@code path} is {@code null}.
+     * @throws IllegalStateException If the HID API is not initialized.
+     */
+    public static @Nullable HidDeviceStructure
+    open(@NotNull String path) {
+        Objects.requireNonNull(path, "path cannot be null");
 
-  /**
-   * Enumerate the attached HID devices
-   *
-   * @param vendor  The vendor ID
-   * @param product The product ID
-   * @return The device info of the matching device
-   */
-  public static HidDeviceInfoStructure enumerateDevices(int vendor, int product) {
+        Pointer ptr;
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            ptr = hidApi.hid_open_path(path);
+        } finally {
+            HID_API_LOCK.unlock();
+        }
 
-    return hidApiLibrary.hid_enumerate((short) vendor, (short) product);
+        if (ptr == null) {
+            return null;
+        }
 
-  }
-
-  /**
-   * Free an enumeration linked list
-   *
-   * @param list The list to free
-   */
-  public static void freeEnumeration(HidDeviceInfoStructure list) {
-
-    hidApiLibrary.hid_free_enumeration(list.getPointer());
-
-  }
-
-  /**
-   * @param device The HID device structure
-   * @return A string describing the last error which occurred
-   */
-  public static String getLastErrorMessage(HidDeviceStructure device) {
-
-    if (device == null) {
-      return DEVICE_NULL;
+        return new HidDeviceStructure(ptr);
     }
 
-    Pointer p = hidApiLibrary.hid_error(device.ptr);
+    /**
+     * Closes an HID device.
+     *
+     * @param device The device to close.
+     * @throws IllegalStateException If the HID API is not initialized.
+     */
+    public static void close(@Nullable HidDeviceStructure device) {
+        if (device == null) {
+            return; /* don't bother with obtaining a lock */
+        }
 
-    return p == null ? null : new WideStringBuffer(p.getByteArray(0, WSTR_LEN)).toString();
-  }
-
-  /**
-   * @param device The HID device
-   * @return The device manufacturer string
-   */
-  public static String getManufacturer(HidDeviceStructure device) {
-
-    if (device == null) {
-      return DEVICE_NULL;
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            hidApi.hid_close(device.ptr);
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    WideStringBuffer wStr = new WideStringBuffer(WSTR_LEN);
-    hidApiLibrary.hid_get_manufacturer_string(device.ptr, wStr, WSTR_LEN);
+    /**
+     * Enumerates the attached HID devices.
+     * <p>
+     * You can iterate through each device like so:
+     * <pre>
+     * HidDeviceInfoStructure deviceInfo =
+     *     HidApi.enumerateDevices(vendorId, productId);
+     * while(deviceInfo != null) {
+     *     &sol;* process device info *&sol;
+     *     deviceInfo = deviceInfo.next;
+     * }
+     * </pre>
+     *
+     * @param vendorId  The vendor ID, {@code 0} for wildcard.
+     * @param productId The product ID, {@code 0} for wildcard.
+     * @return The info of the first matching device, {@code null} if no
+     * devices were found.
+     * @throws IllegalArgumentException If the vendor ID or product ID do
+     *                                  not fit inside an unsigned short.
+     * @throws IllegalStateException    If the HID API is not initialized.
+     */
+    public static @Nullable HidDeviceInfoStructure enumerateDevices(
+            @Range(from = 0x0000, to = 0xFFFF) int vendorId,
+            @Range(from = 0x0000, to = 0xFFFF) int productId) {
+        requireUnsignedShort("vendorId", vendorId);
+        requireUnsignedShort("productId", productId);
 
-    return wStr.toString();
-  }
-
-  /**
-   * @param device The HID device
-   * @return The device product ID
-   */
-  public static String getProductId(HidDeviceStructure device) {
-
-    if (device == null) {
-      return DEVICE_NULL;
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            return hidApi.hid_enumerate(
+                    (short) vendorId, (short) productId);
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    WideStringBuffer wBuffer = new WideStringBuffer(WSTR_LEN);
-    hidApiLibrary.hid_get_product_string(device.ptr, wBuffer, WSTR_LEN);
+    /**
+     * Frees an enumerable HID device list.
+     *
+     * @param list The list to free.
+     */
+    public static void freeEnumeration(
+            @Nullable HidDeviceInfoStructure list) {
+        if (list == null) {
+            return; /* don't bother with obtaining a lock */
+        }
 
-    return wBuffer.toString();
-  }
-
-  /**
-   * @param device The HID device
-   * @return The device serial number
-   */
-  public static String getSerialNumber(HidDeviceStructure device) {
-
-    if (device == null) {
-      return DEVICE_NULL;
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            hidApi.hid_free_enumeration(list.getPointer());
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    WideStringBuffer wBuffer = new WideStringBuffer(WSTR_LEN);
+    /**
+     * Returns a string describing the last error that occurred for an
+     * HID device.
+     *
+     * @param device The HID device structure.
+     * @return The message of the last error that occurred for the device,
+     * {@code null} if no errors have occurred.
+     * @throws IllegalStateException If the HID API is not initialized.
+     */
+    public static @Nullable String getLastErrorMessage(
+            @Nullable HidDeviceStructure device) {
+        if (device == null) {
+            return null; /* don't bother with obtaining a lock */
+        }
 
-    hidApiLibrary.hid_get_serial_number_string(device.ptr, wBuffer, WSTR_LEN);
+        Pointer ptr;
 
-    return wBuffer.toString();
-  }
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            ptr = hidApi.hid_error(device.ptr);
+        } finally {
+            HID_API_LOCK.unlock();
+        }
 
-  /**
-   * Set the device handle to be non-blocking
-   * <br>
-   * In non-blocking mode calls to hid_read() will return immediately with a value of 0 if there is no data to be read.
-   * In blocking mode, hid_read() will wait (block) until there is data to read before returning
-   * <br>
-   * Non-blocking can be turned on and off at any time
-   *
-   * @param device      The HID device
-   * @param nonBlocking True if non-blocking mode is required
-   * @return True if successful
-   */
-  public static boolean setNonBlocking(HidDeviceStructure device, boolean nonBlocking) {
+        if (ptr == null) {
+            return null; /* no error message */
+        }
 
-    return device != null && 0 == hidApiLibrary.hid_set_nonblocking(device.ptr, nonBlocking ? 1 : 0);
-
-  }
-
-  /**
-   * Read an Input report from a HID device
-   * Input reports are returned to the host through the INTERRUPT IN endpoint. The first byte
-   * will contain the Report ID if the device uses numbered reports.
-   *
-   * @param device The HID device
-   * @param buffer The buffer to read into (allow an extra byte if device supports multiple report IDs)
-   * @return The actual number of bytes read and -1 on error. If no packet was available to be read
-   * and the handle is in non-blocking mode, this function returns 0.
-   */
-  public static int read(HidDeviceStructure device, byte[] buffer) {
-
-    if (device == null || buffer == null) {
-      return DEVICE_ERROR;
+        byte[] strBytes = ptr.getByteArray(0, WSTR_DEFAULT_LEN);
+        WideStringBuffer wStr = new WideStringBuffer(strBytes);
+        return wStr.toString();
     }
 
-    WideStringBuffer wBuffer = new WideStringBuffer(buffer);
+    /**
+     * Returns the manufacturer of an HID device.
+     *
+     * @param device The HID device structure.
+     * @return The manufacturer of the device.
+     * @throws IllegalStateException If the HID API is not initialized.
+     */
+    public static @Nullable String getManufacturer(
+            @Nullable HidDeviceStructure device) {
+        if (device == null) {
+            return null; /* don't bother with obtaining a lock */
+        }
 
-    int result = hidApiLibrary.hid_read(device.ptr, wBuffer, wBuffer.buffer.length);
-
-    if (result > 0) {
-      logTraffic(wBuffer, false);
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            WideStringBuffer wStr =
+                    new WideStringBuffer(WSTR_DEFAULT_LEN);
+            hidApi.hid_get_manufacturer_string(
+                    device.ptr, wStr, WSTR_DEFAULT_LEN);
+            return wStr.toString();
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    return result;
+    /**
+     * Returns the product ID of an HID device.
+     *
+     * @param device The HID device structure.
+     * @return The product ID of the device.
+     * @throws IllegalStateException If the HID API is not initialized.
+     */
+    public static @Nullable String getProductId(
+            @Nullable HidDeviceStructure device) {
+        if (device == null) {
+            return null; /* don't bother with obtaining a lock */
+        }
 
-  }
-
-  /**
-   * Read an Input report from a HID device with timeout
-   *
-   * @param device        The HID device
-   * @param buffer        The buffer to read into
-   * @param timeoutMillis The number of milliseconds to wait before giving up
-   * @return The actual number of bytes read and -1 on error. If no packet was available to be read within
-   * the timeout period returns 0.
-   */
-  public static int read(HidDeviceStructure device, byte[] buffer, int timeoutMillis) {
-
-    if (device == null || buffer == null) {
-      return DEVICE_ERROR;
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            WideStringBuffer wStr =
+                    new WideStringBuffer(WSTR_DEFAULT_LEN);
+            hidApi.hid_get_product_string(
+                    device.ptr, wStr, WSTR_DEFAULT_LEN);
+            return wStr.toString();
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    WideStringBuffer wBuffer = new WideStringBuffer(buffer);
+    /**
+     * Returns the serial number of an HID device.
+     *
+     * @param device The HID device structure.
+     * @return The serial number of the device.
+     * @throws IllegalStateException If the HID API is not initialized.
+     */
+    public static @Nullable String getSerialNumber(
+            @Nullable HidDeviceStructure device) {
+        if (device == null) {
+            return null; /* don't bother with obtaining a lock */
+        }
 
-    int result = hidApiLibrary.hid_read_timeout(device.ptr, wBuffer, buffer.length, timeoutMillis);
-
-    if (result > 0) {
-      logTraffic(wBuffer, false);
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            WideStringBuffer wStr =
+                    new WideStringBuffer(WSTR_DEFAULT_LEN);
+            hidApi.hid_get_serial_number_string(
+                    device.ptr, wStr, WSTR_DEFAULT_LEN);
+            return wStr.toString();
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    return result;
+    /**
+     * Sets an HID device to be non-blocking.
+     * <p>
+     * In non-blocking mode, calls to {@code hid_read()} will immediately
+     * return with a value of zero if there is no data to be read. In
+     * blocking mode, {@code hid_read()} will block the current thread
+     * until there is data to read before returning the number of bytes
+     * read.
+     * <p>
+     * Non-blocking I/O can be turned on and off at any time.
+     *
+     * @param device      The HID device structure.
+     * @param nonBlocking {@code true} to enable non-blocking,
+     *                    {@code false} to disable non-blocking.
+     * @return {@code 0} on success, {@code -1} on error.
+     */
+    public static int setNonBlocking(
+            @Nullable HidDeviceStructure device,
+            boolean nonBlocking) {
+        if (device == null) {
+            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
+        }
 
-  }
-
-  /**
-   * Get a feature report from a HID device
-   * <b>HID API notes</b>
-   * <br>
-   * Under the covers the HID library will set the first byte of data[] to the Report ID of the report to be read.
-   * Upon return, the first byte will still contain the Report ID, and the report data will start in data[1]
-   * This method handles all the wide string and array manipulation for you
-   *
-   * @param device   The HID device
-   * @param data     The buffer to contain the report
-   * @param reportId The report ID (or (byte) 0x00)
-   * @return The number of bytes read plus one for the report ID (which has been removed from the first byte), or -1 on error.
-   */
-  public static int getFeatureReport(HidDeviceStructure device, byte[] data, byte reportId) {
-
-    if (device == null || data == null) {
-      return DEVICE_ERROR;
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            return hidApi.hid_set_nonblocking(
+                    device.ptr, nonBlocking ? 1 : 0);
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    // Create a large buffer
-    WideStringBuffer report = new WideStringBuffer(WSTR_LEN);
-    report.buffer[0] = reportId;
-    int res = hidApiLibrary.hid_get_feature_report(device.ptr, report, data.length + 1);
+    /**
+     * Reads an input report from an HID device.
+     * <p>
+     * Input reports are returned to the host through the INTERRUPT
+     * IN endpoint. The first byte will contain the report number if
+     * the device uses numbered reports.
+     *
+     * @param device The device handle.
+     * @param buffer A buffer to write the read data into.
+     * @return The number of bytes read, {@code -1} on error. If there is
+     * no data to be read and the handle is in non-blocking mode, {@code 0}
+     * is returned immediately.
+     */
+    public static int read(
+            @Nullable HidDeviceStructure device,
+            byte @Nullable [] buffer) {
+        if (device == null || buffer == null) {
+            return DEVICE_ERROR_CODE;
+        }
 
-    if (res == -1) {
-      return res;
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+
+            WideStringBuffer wStr = new WideStringBuffer(buffer);
+            int bytesRead = hidApi.hid_read(
+                    device.ptr, wStr, buffer.length);
+            if (bytesRead > 0) {
+                logTraffic(wStr, false);
+            }
+
+            return bytesRead;
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    // Avoid index out of bounds exception
-    System.arraycopy(report.buffer, 1, data, 0, Math.min(res, data.length));
+    /**
+     * Reads an input report from an HID device with a timeout.
+     * <p>
+     * Input reports are returned to the host through the INTERRUPT
+     * IN endpoint. The first byte will contain the report number if
+     * the device uses numbered reports.
+     *
+     * @param device    The device handle.
+     * @param buffer    A buffer to write the read data into.
+     * @param timeoutMs The timeout in milliseconds, or {@code -1} to
+     *                  wait indefinitely.
+     * @return The number of bytes read, {@code -1} on error. If there is
+     * no data to be read within the timeout, {@code 0} is returned.
+     */
+    public static int read(
+            @Nullable HidDeviceStructure device,
+            byte @Nullable [] buffer,
+            @Range(from = 0L, to = Long.MAX_VALUE) long timeoutMs
+    ) {
+        if (device == null || buffer == null) {
+            return DEVICE_ERROR_CODE;
+        }
 
-    logTraffic(report, false);
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
 
-    return res;
+            /* TODO: handle down-casting from long to int */
+            WideStringBuffer wStr = new WideStringBuffer(buffer);
+            int numBytes = hidApi.hid_read_timeout(device.ptr,
+                    wStr, buffer.length, (int) timeoutMs);
+            if (numBytes > 0) {
+                logTraffic(wStr, false);
+            }
 
-  }
+            return numBytes;
+        } finally {
+            HID_API_LOCK.unlock();
+        }
 
-  /**
-   * Send a Feature report to the device using a simplified interface
-   * <b>HID API notes</b>
-   * <br>
-   * Under the covers, feature reports are sent over the Control endpoint as a Set_Report transfer.
-   * The first byte of data[] must contain the Report ID. For devices which only support a single report,
-   * this must be set to 0x0. The remaining bytes contain the report data
-   * Since the Report ID is mandatory, calls to hid_send_feature_report() will always contain one more byte than
-   * the report contains.
-   * <br>
-   * For example, if a hid report is 16 bytes long, 17 bytes must be passed to
-   * hid_send_feature_report(): the Report ID (or 0x00, for devices which do not use numbered reports), followed by
-   * the report data (16 bytes). In this example, the bytes written would be 17.
-   * <br>
-   * This method handles all the array manipulation for you
-   *
-   * @param device   The HID device
-   * @param data     The feature report data (will be widened and have the report ID pre-pended)
-   * @param reportId The report ID (or (byte) 0x00)
-   * @return This function returns the actual number of bytes written and -1 on error.
-   */
-  public static int sendFeatureReport(HidDeviceStructure device, byte[] data, byte reportId) {
-
-    if (device == null || data == null) {
-      return DEVICE_ERROR;
     }
 
-    WideStringBuffer report = new WideStringBuffer(data.length + 1);
-    report.buffer[0] = reportId;
+    /**
+     * Gets a feature report from an HID device.
+     *
+     * @param device   The device handle.
+     * @param buffer   A buffer to write the data into.
+     * @param reportId The ID of the report to read.
+     * @return The number of bytes read, {@code -1} on error.
+     */
+    public static int getFeatureReport(
+            @Nullable HidDeviceStructure device,
+            byte @Nullable [] buffer,
+            byte reportId) {
+        if (device == null || buffer == null) {
+            return DEVICE_ERROR_CODE;
+        }
 
-    System.arraycopy(data, 0, report.buffer, 1, data.length);
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
 
-    logTraffic(report, true);
+            /*
+             * TODO: Should we even use this? It feels like an
+             *  incredible waste of computing time just to have
+             *  a dedicated report ID parameter. It also makes
+             *  off by one errors much easier to occur...
+             */
+            WideStringBuffer report = new WideStringBuffer(
+                    buffer.length + 1);
+            report.buffer[0] = reportId;
+            int bytesRead = hidApi.hid_get_feature_report(
+                    device.ptr, report, buffer.length + 1);
+            if (bytesRead == -1) {
+                return bytesRead; /* error occurred, no data */
+            }
 
-    return hidApiLibrary.hid_send_feature_report(device.ptr, report, report.buffer.length);
+            System.arraycopy(report.buffer, 1, buffer, 0, buffer.length);
+            logTraffic(report, false);
 
-  }
+            return bytesRead;
+        } finally {
+            HID_API_LOCK.unlock();
+        }
 
-  /**
-   * Write an Output report to a HID device using a simplified interface
-   * <b>HID API notes</b>
-   * <br>
-   * In USB HID the first byte of the data packet must contain the Report ID.
-   * For devices which only support a single report, this must be set to 0x00.
-   * The remaining bytes contain the report data. Since the Report ID is mandatory,
-   * calls to <code>hid_write()</code> will always contain one more byte than the report
-   * contains.
-   * <br>
-   * For example, if a HID report is 16 bytes long, 17 bytes must be passed to <code>hid_write()</code>,
-   * the Report ID (or 0x00, for devices with a single report), followed by the report data (16 bytes).
-   * In this example, the length passed in would be 17.
-   * <code>hid_write()</code> will send the data on the first OUT endpoint, if one exists.
-   * If it does not, it will send the data through the Control Endpoint (Endpoint 0)
-   *
-   * @param device   The device
-   * @param data     The report data to write (should not include the Report ID)
-   * @param len      The length of the report data (should not include the Report ID)
-   * @param reportId The report ID (or (byte) 0x00)
-   * @return The number of bytes written, or -1 if an error occurs
-   */
-  public static int write(HidDeviceStructure device, byte[] data, int len, byte reportId) {
-
-    // Fail fast
-    if (device == null || data == null) {
-      return DEVICE_ERROR;
     }
 
-    // Precondition checks
-    if (data.length < len) {
-      len = data.length;
+    /**
+     * Sends a feature report to an HID device.
+     * <p>
+     * Feature reports are sent over the control endpoint as a
+     * {@code set_report} transfer.
+     *
+     * @param device   The device handle.
+     * @param data     The data to send.
+     * @param reportId The ID of the report to send.
+     * @return The number of bytes written, {@code -1} on error.
+     */
+    public static int sendFeatureReport(
+            @Nullable HidDeviceStructure device,
+            byte @Nullable [] data,
+            byte reportId) {
+        if (device == null || data == null) {
+            return DEVICE_ERROR_CODE;
+        }
+
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+
+            /*
+             * TODO: Should we even use this? It feels like an
+             *  incredible waste of computing time just to have
+             *  a dedicated report ID parameter. It also makes
+             *  off by one errors much easier to occur...
+             */
+            WideStringBuffer report = new WideStringBuffer(data.length + 1);
+            report.buffer[0] = reportId;
+            System.arraycopy(data, 0, report.buffer, 1, data.length);
+
+            logTraffic(report, true);
+
+            return hidApi.hid_send_feature_report(
+                    device.ptr, report, report.buffer.length);
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    final WideStringBuffer report;
+    /**
+     * Writes an output report to an HID device.
+     * <p>
+     * This function will send the data to the first OUT endpoint, if one
+     * exists. If it does not, it will send the data through the control
+     * endpoint (endpoint 0).
+     *
+     * @param device   The device handle.
+     * @param data     The data to send.
+     * @param length   The number of bytes to send.
+     * @param reportId The ID of the report to send. For devices that
+     *                 only support a single report, use {@code 0x00}.
+     * @return The number of bytes written, {@code -1} on error.
+     */
+    public static int write(
+            @Nullable HidDeviceStructure device,
+            byte @Nullable [] data,
+            @Range(from = 0, to = Integer.MAX_VALUE) int length,
+            byte reportId) {
+        if (device == null || data == null) {
+            return DEVICE_ERROR_CODE;
+        } else if (length >= data.length) {
+            String message = "length out of bounds for data";
+            throw new IllegalArgumentException(message);
+        }
 
-    // Put report ID into position 0 and fill out buffer
-    report = new WideStringBuffer(len + 1);
-    report.buffer[0] = reportId;
-    if (len >= 1) {
-      System.arraycopy(data, 0, report.buffer, 1, len);
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+
+            /*
+             * TODO: Should we even use this? It feels like an
+             *  incredible waste of computing time just to have
+             *  a dedicated report ID parameter. It also makes
+             *  off by one errors much easier to occur...
+             */
+            WideStringBuffer report = new WideStringBuffer(length + 1);
+            report.buffer[0] = reportId;
+            System.arraycopy(data, 0, report.buffer, 1, length);
+
+            logTraffic(report, true);
+
+            return hidApi.hid_write(
+                    device.ptr, report, report.buffer.length);
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
 
-    logTraffic(report, true);
+    /**
+     * Gets an indexed string from an HID device.
+     *
+     * @param device The device handle.
+     * @param index  The index of the string to get.
+     * @return The string at the given index, {@code null} on error.
+     */
+    public static String getIndexedString(
+            @Nullable HidDeviceStructure device,
+            @Range(from = 0, to = Integer.MAX_VALUE) int index) {
+        if (device == null) {
+            return null; /* don't bother with obtaining a lock */
+        }
 
-    return hidApiLibrary.hid_write(device.ptr, report, report.buffer.length);
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
 
-  }
+            WideStringBuffer wStr = new WideStringBuffer(WSTR_DEFAULT_LEN);
+            int result = hidApi.hid_get_indexed_string(
+                    device.ptr, index, wStr, WSTR_DEFAULT_LEN);
+            if (result == -1) {
+                return null; /* error occurred, no data */
+            }
 
-  /**
-   * Get a string from a HID device, based on its string index
-   *
-   * @param device The HID device
-   * @param idx    The index
-   * @return The string
-   */
-  public static String getIndexedString(HidDeviceStructure device, int idx) {
-
-    if (device == null) {
-      return DEVICE_NULL;
+            return wStr.toString();
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
-    WideStringBuffer wStr = new WideStringBuffer(WSTR_LEN);
-    int res = hidApiLibrary.hid_get_indexed_string(device.ptr, idx, wStr, WSTR_LEN);
 
-    return res == -1 ? null : wStr.toString();
-  }
+    /**
+     * Gets the report descriptor from an HID device.
+     *
+     * @param device The device handle.
+     * @param buffer A buffer to write the data into.
+     * @param length The buffer length in multiples of {@code wchar_t}.
+     * @return {@code 0} on success, {@code -1} on error.
+     */
+    public static int getReportDescriptor(
+            @Nullable HidDeviceStructure device,
+            byte @Nullable [] buffer,
+            @Range(from = 0, to = Integer.MAX_VALUE) int length
+    ) {
+        if (device == null || buffer == null) {
+            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
+        } else if (length >= buffer.length) {
+            String message = "length out of bounds for buffer";
+            throw new IllegalArgumentException(message);
+        }
 
-  /**
-   * Get a report descriptor from a HID device
-   * <br>
-   * User has to provide a preallocated buffer (4096 bytes recommended) where descriptor will be copied to
-   * <br>
-   * @param device The HID device
-   * @param buffer The buffer to copy descriptor into.
-   * @param size   The size of the buffer in bytes.
-   * @return A non-negative number of bytes actually copied, or -1 on error.
-   * @since 0.14.0 hidapi
-   */
-  public static int getReportDescriptor(HidDeviceStructure device, byte[] buffer, int size) {
-
-    if (device == null) {
-      return -1;
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            return hidApi.hid_get_report_descriptor(
+                    device.ptr, buffer, length);
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
-    return hidApiLibrary.hid_get_report_descriptor(device.ptr, buffer, size);
-  }
 
-  /**
-   * @param buffer  The buffer to serialise for traffic
-   * @param isWrite True if writing (from host to device)
-   */
-  private static void logTraffic(WideStringBuffer buffer, boolean isWrite) {
-    if (HidApi.logTraffic && buffer != null && buffer.size() > 0) {
-      if (isWrite) {
-        System.out.print("> ");
-      } else {
-        System.out.print("< ");
-      }
-      System.out.printf("[%02x]:", buffer.buffer.length);
-      for (byte b : buffer.buffer) {
-        System.out.printf(" %02x", b);
-      }
-      System.out.println();
+    /**
+     * Returns the current version of the HID API library.
+     *
+     * @return The current version in "major.minor.patch" format.
+     * @throws IllegalStateException If the HID API is not initialized.
+     */
+    public static @NotNull String getVersion() {
+        HID_API_LOCK.lock();
+        try {
+            HidApiLibrary hidApi = requireInit();
+            return hidApi.hid_version_str();
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
-  }
 
-  /**
-   * Returns the full version of the underlying hidapi library
-   *
-   * @return The version in major.minor.patch format
-   * @see org.hid4java.HidServices#getNativeVersion
-   */
-  public static String getVersion() {
-    if (hidApiLibrary == null) {
-      init();
+    private static @NotNull HidApiLibrary requireInit() {
+        HID_API_LOCK.lock();
+        try {
+            if (hidApi == null) {
+                String message = "HID API must be initialized";
+                throw new IllegalStateException(message);
+            }
+            return hidApi;
+        } finally {
+            HID_API_LOCK.unlock();
+        }
     }
-    return hidApiLibrary.hid_version_str();
-  }
+
+    private static void requireUnsignedShort(String name, int value) {
+        if (value < 0x0000 || value > 0xFFFF) {
+            String message = name + " must fit inside an unsigned short";
+            throw new IllegalArgumentException(message);
+        }
+    }
+
+    private static void logTraffic(
+            @Nullable WideStringBuffer buffer,
+            boolean isWrite
+    ) {
+        if (!HidApi.logTraffic) {
+            return; /* don't bother with obtaining a lock */
+        } else if (buffer == null || buffer.size() <= 0) {
+            return; /* don't bother with obtaining a lock */
+        }
+
+        /* TODO: use proper logging API */
+
+        System.out.print(isWrite ? ">" : "<");
+        System.out.printf(" [%d bytes]:", buffer.buffer.length);
+        for (int i = 0; i < buffer.buffer.length; i++) {
+            System.out.printf(" %02x", buffer.buffer[i]);
+        }
+        System.out.println();
+    }
 
 }
