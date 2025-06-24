@@ -26,8 +26,9 @@
 package org.hid4java.examples;
 
 import org.hid4java.*;
-import org.hid4java.event.HidServicesEvent;
+import org.hid4java.HidServicesEvent;
 import org.hid4java.jna.HidApi;
+import org.jetbrains.annotations.NotNull;
 
 import java.security.SecureRandom;
 
@@ -172,7 +173,7 @@ public class Fido2AuthenticationExample extends BaseExample {
 
     // Use data received events
     hidServicesSpecification.setAutoDataRead(true);
-    hidServicesSpecification.setDataReadInterval(500);
+    hidServicesSpecification.setDataReadIntervalMs(500);
 
     // Get HID services using custom specification
     HidServices hidServices = HidManager.getHidServices(hidServicesSpecification);
@@ -209,7 +210,7 @@ public class Fido2AuthenticationExample extends BaseExample {
       // This requires complex decoding defined in the referenced documents
       // Reports can be up to 4096 bytes for complex devices so 64 is quite low
       byte[] reportDescriptor = new byte[64];
-      if (fidoDevice.getReportDescriptor(reportDescriptor) > 0) {
+      if (fidoDevice.getReportDescriptor(reportDescriptor)) {
         System.out.println(ANSI_GREEN + "FIDO2 device report descriptor (first 64 bytes): " + fidoDevice.getPath() + ANSI_RESET);
         printAsHex(reportDescriptor);
       }
@@ -265,7 +266,7 @@ public class Fido2AuthenticationExample extends BaseExample {
   }
 
   @Override
-  public void hidDataReceived(HidServicesEvent event) {
+  public void hidDataReceived(@NotNull HidServicesEvent event) {
     super.hidDataReceived(event);
 
     // Analyse the response

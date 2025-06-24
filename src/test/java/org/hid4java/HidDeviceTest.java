@@ -23,7 +23,7 @@ class HidDeviceTest {
     HidDevice testObject = new HidDevice(mockStructure, null, new HidServicesSpecification());
 
     // Assert
-    assertTrue(testObject.isVidPidSerial(0x01, 0x02, "1234"));
+    assertTrue(testObject.matches(0x01, 0x02, "1234"));
 
   }
 
@@ -39,7 +39,7 @@ class HidDeviceTest {
     HidDevice testObject = new HidDevice(mockStructure, null, new HidServicesSpecification());
 
     // Assert
-    assertTrue(testObject.isVidPidSerial(0x8001, 0x8002, "1234"));
+    assertTrue(testObject.matches(0x8001, 0x8002, "1234"));
 
   }
 

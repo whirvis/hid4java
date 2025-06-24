@@ -28,7 +28,8 @@ package org.hid4java.examples;
 import com.sun.jna.Platform;
 import org.hid4java.HidServices;
 import org.hid4java.HidServicesListener;
-import org.hid4java.event.HidServicesEvent;
+import org.hid4java.HidServicesEvent;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.concurrent.TimeUnit;
 
@@ -102,28 +103,28 @@ public abstract class BaseExample implements HidServicesListener {
   }
 
   @Override
-  public void hidDeviceAttached(HidServicesEvent event) {
+  public void hidDeviceAttached(@NotNull HidServicesEvent event) {
 
     System.out.println(ANSI_BLUE + "Device attached: " + event + ANSI_RESET);
 
   }
 
   @Override
-  public void hidDeviceDetached(HidServicesEvent event) {
+  public void hidDeviceDetached(@NotNull HidServicesEvent event) {
 
     System.out.println(ANSI_YELLOW + "Device detached: " + event + ANSI_RESET);
 
   }
 
   @Override
-  public void hidFailure(HidServicesEvent event) {
+  public void hidFailure(@NotNull HidServicesEvent event) {
 
     System.out.println(ANSI_RED + "HID failure: " + event + ANSI_RESET);
 
   }
 
   @Override
-  public void hidDataReceived(HidServicesEvent event) {
+  public void hidDataReceived(@NotNull HidServicesEvent event) {
 
     System.out.printf(ANSI_PURPLE + "Data received:%n");
     byte[] dataReceived = event.getDataReceived();

@@ -55,20 +55,20 @@ class HidDeviceInfoStructureTest {
     testObject.interface_number = 0x06;
     testObject.next = null;
 
-    String expectedShow = "HidDevice\n" +
-      "\tpath:path>\n" +
-      "\tvendor_id: 1\n" +
-      "\tproduct_id: 2\n" +
-      "\tserial_number: serial>\n" +
+    String expectedShow = "HID device\n" +
+      "\tpath: path\n" +
+      "\tvendor_id: 0x0001\n" +
+      "\tproduct_id: 0x0002\n" +
+      "\tserial_number: serial\n" +
       "\trelease_number: 3\n" +
-      "\tmanufacturer_string: manufacturer>\n" +
-      "\tproduct_string: product>\n" +
+      "\tmanufacturer_string: manufacturer\n" +
+      "\tproduct_string: product\n" +
       "\tusage_page: 4\n" +
       "\tusage: 5\n" +
-      "\tinterface_number: 6\n";
+      "\tinterface_number: 6";
 
     // Act
-    String actualShow = testObject.show();
+    String actualShow = testObject.toString();
 
     // Assert
     assertEquals(expectedShow, actualShow);
