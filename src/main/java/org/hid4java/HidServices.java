@@ -23,7 +23,6 @@
  */
 package org.hid4java;
 
-import org.hid4java.event.HidServicesListenerList;
 import org.hid4java.jna.HidApi;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

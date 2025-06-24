@@ -21,13 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package org.hid4java.event;
+package org.hid4java;
 
-import org.hid4java.HidDevice;
-import org.hid4java.HidServicesListener;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.annotations.Range;
 
 import java.util.ArrayList;
 import java.util.Collections;
