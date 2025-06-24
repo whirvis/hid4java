@@ -29,6 +29,8 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * JNA proxy to the Darwin HID API library.
+ *
+ * @since 0.8.0
  */
 public interface DarwinHidApiLibrary extends HidRawHidApiLibrary {
 
@@ -48,7 +50,6 @@ public interface DarwinHidApiLibrary extends HidRawHidApiLibrary {
      *                      them opened in exclusive mode.
      * @see #hid_open(short, short, WString)
      * @see #hid_open_path(String)
-     * @since hidapi 0.12.0
      */
     void hid_darwin_set_open_exclusive(int openExclusive);
 

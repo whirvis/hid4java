@@ -27,6 +27,7 @@ package org.hid4java;
  * Determines how HID devices will be scanned.
  *
  * @see HidServicesSpecification#setScanMode(ScanMode)
+ * @since 0.0.1
  */
 public enum ScanMode {
 
