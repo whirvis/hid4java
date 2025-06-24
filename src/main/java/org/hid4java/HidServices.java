@@ -208,15 +208,20 @@ public class HidServices {
             @Range(from = 0x0000, to = 0xFFFF) int vendorId,
             @Range(from = 0x0000, to = 0xFFFF) int productId,
             @Nullable String serialNumber) {
-        List<HidDevice> devices = manager.getAttachedHidDevices();
-        for (HidDevice device : devices) {
-            if (!device.matches(vendorId, productId, serialNumber)) {
-                continue; /* not the device we're looking for */
+        servicesLock.lock();
+        try {
+            List<HidDevice> devices = manager.getAttachedHidDevices();
+            for (HidDevice device : devices) {
+                if (!device.matches(vendorId, productId, serialNumber)) {
+                    continue; /* not the device we're looking for */
+                }
+                device.open();
+                return device;
             }
-            device.open();
-            return device;
+            return null;
+        } finally {
+            servicesLock.unlock();
         }
-        return null;
     }
 
     /**
