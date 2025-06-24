@@ -1,7 +1,7 @@
 /*
- * The MIT License (MIT)
+ * the MIT License (MIT)
  *
- * Copyright (c) 2014-2015 Gary Rowe
+ * Copyright (c) 2014-2025 Gary Rowe, "Whirvis" Trent Summerlin
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -10,7 +10,7 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
+ * the above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -20,338 +20,321 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
  */
-
 package org.hid4java;
 
 import org.hid4java.jna.HidApi;
 import org.hid4java.jna.HidDeviceInfoStructure;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Manager to provide the following to HID services:
- * <ul>
- * <li>Access to the underlying JNA and hidapi library</li>
- * <li>Device attach/detach detection (if configured)</li>
- * <li>Device data read (if configured)</li>
- * </ul>
+ * Manager which provides access to the underlying HID API library, device
+ * attach/detach events, and device data reading (if configured).
  *
  * @since 0.0.1
  */
 class HidDeviceManager {
 
-  /**
-   * The HID services specification providing configuration parameters
-   */
-  private final HidServicesSpecification hidServicesSpecification;
+    private final HidServicesListenerList listeners;
+    private final HidServicesSpecification specs;
+    private final Map<String, HidDevice> attachedDevices;
+    private final ReadWriteLock lock;
 
-  /**
-   * The currently attached devices keyed on ID
-   */
-  private final Map<String, HidDevice> attachedDevices = Collections.synchronizedMap(new HashMap<String, HidDevice>());
+    private Thread scanThread;
 
-  /**
-   * HID services listener list
-   */
-  private final HidServicesListenerList listenerList;
+    HidDeviceManager(
+            @NotNull HidServicesListenerList listeners,
+            @NotNull HidServicesSpecification specs) {
+        this.listeners = listeners;
+        this.specs = specs;
+        this.attachedDevices = new HashMap<>();
+        this.lock = new ReentrantReadWriteLock();
 
-  /**
-   * The device enumeration thread
-   * <br>
-   * We use a Thread instead of Executor since it may be stopped/paused/restarted frequently
-   * and executors are more heavyweight in this regard
-   */
-  private Thread scanThread = null;
-
-  /**
-   * Constructs a new device manager
-   *
-   * @param listenerList             The HID services providing access to the event model
-   * @param hidServicesSpecification Provides various parameters for configuring HID services
-   *
-   * @throws HidException If USB HID initialization fails
-   */
-  HidDeviceManager(HidServicesListenerList listenerList, HidServicesSpecification hidServicesSpecification) throws HidException {
-
-    this.listenerList = listenerList;
-    this.hidServicesSpecification = hidServicesSpecification;
-
-    // Attempt to initialise and fail fast
-    try {
-      HidApi.init();
-    } catch (Throwable t) {
-      // Typically this is a linking issue with the native library
-      throw new HidException("Hidapi did not initialise: " + t.getMessage(), t);
+        /* attempt to initialize immediately */
+        try {
+            HidApi.init();
+        } catch (Exception e) {
+            throw new HidException("Unable to initialize HID API", e);
+        }
     }
 
-  }
-
-  /**
-   * Starts the manager
-   * <br>
-   * If already started (scanning) it will immediately return without doing anything
-   * <br>
-   * Otherwise, this will perform a one-off scan of all devices then if the scan interval
-   * is zero will stop there or will start the scanning daemon thread at the required interval.
-   *
-   * @throws HidException If something goes wrong (such as Hidapi not initialising correctly)
-   */
-  public void start() {
-
-    // Check for previous start
-    if (this.isScanning()) {
-      return;
+    void onDeviceDataReceived(
+            HidDevice hidDevice, byte[] dataReceived) {
+        if (dataReceived.length == 0) {
+            return; /* don't bother with obtaining a lock */
+        }
+        lock.writeLock().lock();
+        try {
+            listeners.fireHidDataReceived(hidDevice, dataReceived);
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
-    // Perform a one-off scan to populate attached devices
-    scan();
-
-    // Ensure we have a scan thread available
-    configureScanThread(getScanRunnable());
-
-  }
-
-  /**
-   * Stop the scan thread and close all attached devices
-   * <br>
-   * This is normally part of a general application shutdown and will
-   * also clear the attached devices map
-   */
-  public synchronized void stop() {
-
-    stopScanThread();
-
-    // Close all attached devices
-    for (HidDevice hidDevice: attachedDevices.values()) {
-        hidDevice.close();
-    }
-
-    // Remove all entries from the attached devices
-    attachedDevices.clear();
-
-  }
-
-  /**
-   * Updates the device list by adding newly connected devices to it and by
-   * removing no longer connected devices.
-   * <br>
-   * Will fire attach/detach events as appropriate.
-   */
-  public synchronized void scan() {
-
-    List<String> removeList = new ArrayList<>();
-
-    List<HidDevice> attachedHidDeviceList = getAttachedHidDevices();
-
-    for (HidDevice attachedDevice : attachedHidDeviceList) {
-
-      if (!this.attachedDevices.containsKey(attachedDevice.getPath())) {
-
-        // Device has become attached so add it but do not open
-        attachedDevices.put(attachedDevice.getPath(), attachedDevice);
-
-        // Fire the event on a separate thread
-        listenerList.fireHidDeviceAttached(attachedDevice);
-
-      }
-    }
-
-    for (Map.Entry<String, HidDevice> entry : attachedDevices.entrySet()) {
-
-      String deviceId = entry.getKey();
-      HidDevice hidDevice = entry.getValue();
-
-      if (!attachedHidDeviceList.contains(hidDevice)) {
-
-        // Keep track of removals
-        removeList.add(deviceId);
-
-        // Fire the event on a separate thread
-        listenerList.fireHidDeviceDetached(this.attachedDevices.get(deviceId));
-
-      }
-    }
-
-    if (!removeList.isEmpty()) {
-      // Update the attached devices map
-      this.attachedDevices.keySet().removeAll(removeList);
-    }
-
-  }
-
-  /**
-   * @return True if the scan thread is running, false otherwise.
-   */
-  public boolean isScanning() {
-    return scanThread != null && scanThread.isAlive();
-  }
-
-  /**
-   * @return A list of all attached HID devices
-   */
-  public List<HidDevice> getAttachedHidDevices() {
-
-    List<HidDevice> hidDeviceList = new ArrayList<>();
-
-    final HidDeviceInfoStructure root;
-    try {
-      // Use 0,0 to list all attached devices
-      // This comes back as a linked list from hidapi
-      root = HidApi.enumerateDevices(0, 0);
-    } catch (Throwable e) {
-      // Could not initialise hidapi (possibly an unknown platform)
-      // Trigger a general stop as something serious has happened
-      stop();
-      // Inform the caller that something serious has gone wrong
-      throw new HidException("Unable to start HidApi: " + e.getMessage());
-    }
-
-    if (root != null) {
-
-      HidDeviceInfoStructure hidDeviceInfoStructure = root;
-      do {
-        // Wrap in HidDevice
-        hidDeviceList.add(new HidDevice(
-          hidDeviceInfoStructure,
-          this,
-          hidServicesSpecification));
-        // Move to the next in the linked list
-        hidDeviceInfoStructure = hidDeviceInfoStructure.next;
-      } while (hidDeviceInfoStructure != null);
-
-      // Dispose of the device list to free memory
-      HidApi.freeEnumeration(root);
-    }
-
-    return hidDeviceList;
-  }
-
-  /**
-   * Indicate that a device write has occurred which may require a change in scanning frequency
-   */
-  public void afterDeviceWrite() {
-
-    if (ScanMode.SCAN_AT_FIXED_INTERVAL_WITH_PAUSE_AFTER_WRITE == hidServicesSpecification.getScanMode() && isScanning()) {
-      stopScanThread();
-      // Ensure we have a new scan executor service available
-      configureScanThread(getScanRunnable());
-
-    }
-
-  }
-
-  /**
-   * Indicate that an automatic data read has occurred which may require an event to be fired
-   *
-   * @param hidDevice The device that has received data
-   * @param dataReceived The data received
-   * @since 0.8.0
-   */
-  public void afterDeviceDataRead(HidDevice hidDevice, byte[] dataReceived) {
-
-    if (dataReceived != null && dataReceived.length > 0) {
-      this.listenerList.fireHidDataReceived(hidDevice, dataReceived);
-    }
-
-  }
-
-  /**
-   * Stop the scan thread
-   */
-  private synchronized void stopScanThread() {
-
-    if (isScanning()) {
-      scanThread.interrupt();
-      // Wait up to 50ms for scanThread to terminate to avoid
-      // spurious return values from isScanning()
-      // See hid4java issue #125
-      try {
-        scanThread.join(50);
-      } catch (InterruptedException e) {
-        // Ignore and continue
-      }
-    }
-
-  }
-
-  /**
-   * Configures the scan thread to allow recovery from stop or pause
-   */
-  private synchronized void configureScanThread(Runnable scanRunnable) {
-
-    if (isScanning()) {
-      stopScanThread();
-    }
-
-    // Require a new one
-    scanThread = new Thread(scanRunnable);
-    scanThread.setDaemon(true);
-    scanThread.setName("hid4java device scanner");
-    scanThread.start();
-
-  }
-
-  private synchronized Runnable getScanRunnable() {
-
-    final long scanInterval = hidServicesSpecification.getScanIntervalMs();
-    final long pauseInterval = hidServicesSpecification.getPauseIntervalMs();
-
-    switch (hidServicesSpecification.getScanMode()) {
-      case NO_SCAN:
-        return new Runnable() {
-          @Override
-          public void run() {
-            // Do nothing
-          }
-        };
-      case SCAN_AT_FIXED_INTERVAL:
-        return new Runnable() {
-          @Override
-          public void run() {
-
-            while (true) {
-              try {
-                //noinspection BusyWait
-                Thread.sleep(scanInterval);
-              } catch (final InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-              }
-              scan();
+    void onDeviceWrite() {
+        lock.writeLock().lock();
+        try {
+            if (!this.isScanningNoLock() || specs.getScanMode() !=
+                    ScanMode.SCAN_AT_FIXED_INTERVAL_WITH_PAUSE_AFTER_WRITE) {
+                return; /* nothing to do */
             }
-          }
-        };
-      case SCAN_AT_FIXED_INTERVAL_WITH_PAUSE_AFTER_WRITE:
-        return new Runnable() {
-          @Override
-          public void run() {
-            // Provide an initial pause
+
+            /* ensure we have a new scan executor service available */
+            this.stopScanThread();
+            this.configureScanThread();
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Returns all currently attached HID devices.
+     *
+     * @return All currently attached HID devices.
+     */
+    public @NotNull List<HidDevice> getAttachedHidDevices() {
+        HidDeviceInfoStructure root;
+        try {
+            root = HidApi.enumerateDevices(0x0000, 0x0000);
+        } catch (Throwable e) {
+            this.stop(); /* something serious has happened */
+            throw new HidException("Unable to initialize HID API", e);
+        }
+
+        /* just quit if no devices were found */
+        if (root == null) {
+            return Collections.emptyList();
+        }
+
+        List<HidDevice> devices = new ArrayList<>();
+        HidDeviceInfoStructure current = root;
+        do {
+            devices.add(new HidDevice(current, this, specs));
+            current = current.next;
+        } while (current != null);
+        HidApi.freeEnumeration(root);
+
+        return devices;
+    }
+
+    private boolean isScanningNoLock() {
+        return scanThread != null && scanThread.isAlive();
+    }
+
+    /**
+     * Returns if the scan thread is running.
+     *
+     * @return {@code true} if the scan thread is running,
+     * {@code false} otherwise.
+     */
+    public boolean isScanning() {
+        lock.readLock().lock();
+        try {
+            return this.isScanningNoLock();
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    private void scanNoLock() {
+        List<String> nowDetached = new ArrayList<>();
+        List<HidDevice> currentlyAttached = this.getAttachedHidDevices();
+
+        /* find all new currently attached devices */
+        for (HidDevice device : currentlyAttached) {
+            String path = device.getPath();
+            if (!attachedDevices.containsKey(path)) {
+                attachedDevices.put(path, device);
+                listeners.fireHidDeviceAttached(device);
+            }
+        }
+
+        /* find all devices that have been detached */
+        for (Map.Entry<String, HidDevice> entry : attachedDevices.entrySet()) {
+            HidDevice device = entry.getValue();
+            if (!currentlyAttached.contains(device)) {
+                nowDetached.add(device.getPath());
+                listeners.fireHidDeviceDetached(device);
+            }
+        }
+
+        if (!nowDetached.isEmpty()) {
+            nowDetached.forEach(attachedDevices.keySet()::remove);
+        }
+    }
+
+    /**
+     * Scans for newly connected devices and removes devices that are no
+     * longer connected.
+     * <p>
+     * This will fire device attach/detach events as appropriate.
+     */
+    public void scan() {
+        lock.writeLock().lock();
+        try {
+            this.scanNoLock();
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+
+    private void configureScanThread() {
+        lock.writeLock().lock();
+        try {
+            if (this.isScanningNoLock()) {
+                this.stopScanThread();
+            }
+
+            Thread scanThread = new ScanThread(this);
+            scanThread.setDaemon(true);
+            scanThread.setName("hid4java device scanner");
+            scanThread.start();
+
+            this.scanThread = scanThread;
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    private void stopScanThread() {
+        lock.writeLock().lock();
+        try {
+            if (!this.isScanningNoLock()) {
+                return; /* nothing to do */
+            }
+
+            /*
+             * We must wait up to 50ms for the scan thread to terminate
+             * in order to avoid spurious return values from isScanning().
+             * See hid4java issue #125.
+             */
+            scanThread.interrupt();
             try {
-              Thread.sleep(pauseInterval);
-            } catch (final InterruptedException e) {
-              Thread.currentThread().interrupt();
+                scanThread.join(50);
+            } catch (InterruptedException e) {
+                /* ignore and continue */
             }
-
-            // Switch to continuous running
-            while (true) {
-              try {
-                //noinspection BusyWait
-                Thread.sleep(scanInterval);
-              } catch (final InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-              }
-              scan();
-            }
-          }
-        };
-      default:
-        return null;
+        } finally {
+            lock.writeLock().unlock();
+        }
     }
 
+    /**
+     * Starts the manager.
+     * <p>
+     * If the manager has already been started, it will immediately return
+     * without doing anything. Otherwise, this will perform a one-off scan of
+     * all devices. Then, if the scan interval is zero, it will stop there or
+     * start the scanning daemon thread at the required interval.
+     *
+     * @throws HidException If an HID error occurs.
+     */
+    public void start() {
+        lock.writeLock().lock();
+        try {
+            if (this.isScanningNoLock()) {
+                return; /* manager already started */
+            }
 
-  }
+            /* perform initial scan to populate attached devices */
+            this.scan();
+            this.configureScanThread();
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    /**
+     * Stops the scan thread and closes all attached devices.
+     *
+     * @throws HidException If an HID error occurs.
+     */
+    public void stop() {
+        lock.writeLock().lock();
+        try {
+            this.stopScanThread();
+            attachedDevices.values().forEach(HidDevice::close);
+            attachedDevices.clear();
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    private static class ScanThread extends Thread {
+
+        private final HidDeviceManager manager;
+        private final Runnable scanRunnable;
+
+        public ScanThread(HidDeviceManager manager) {
+            this.manager = manager;
+            this.scanRunnable = this.getScanRunnable();
+        }
+
+        private void doNotScan() {
+            /* do nothing */
+        }
+
+        @SuppressWarnings("BusyWait")
+        private void scanAtFixedInterval() {
+            long scanInterval = manager.specs.getScanIntervalMs();
+            while (!this.isInterrupted()) {
+                try {
+                    Thread.sleep(scanInterval);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                manager.scan();
+            }
+        }
+
+        @SuppressWarnings("BusyWait")
+        private void scanAtFixedIntervalWithPauseAfterWrite() {
+            long scanInterval = manager.specs.getScanIntervalMs();
+            long pauseInterval = manager.specs.getPauseIntervalMs();
+
+            /* provide an initial pause */
+            try {
+                Thread.sleep(pauseInterval);
+            } catch (final InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            /* switch to continuous scanning */
+            while (!this.isInterrupted()) {
+                try {
+                    Thread.sleep(scanInterval);
+                } catch (final InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                manager.scan();
+            }
+        }
+
+        private Runnable getScanRunnable() {
+            ScanMode scanMode = manager.specs.getScanMode();
+            switch (scanMode) {
+                case NO_SCAN:
+                    return this::doNotScan;
+                case SCAN_AT_FIXED_INTERVAL:
+                    return this::scanAtFixedInterval;
+                case SCAN_AT_FIXED_INTERVAL_WITH_PAUSE_AFTER_WRITE:
+                    return this::scanAtFixedIntervalWithPauseAfterWrite;
+                default:
+                    String message = "Unexpected scan mode " + scanMode;
+                    throw new HidException(message);
+            }
+        }
+
+        @Override
+        public void run() {
+            scanRunnable.run();
+        }
+
+    }
 
 }

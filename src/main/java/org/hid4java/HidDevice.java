@@ -232,7 +232,7 @@ public class HidDevice implements Closeable {
     /* TODO: use locks instead of synchronized */
     private synchronized void dataRead() {
         byte[] data = this.readAll(100);
-        manager.afterDeviceDataRead(this, data);
+        manager.onDeviceDataReceived(this, data);
     }
 
     private void requireOpen() {
@@ -491,7 +491,7 @@ public class HidDevice implements Closeable {
         }
 
         int result = HidApi.write(device, packet, packetLength, reportId);
-        manager.afterDeviceWrite();
+        manager.onDeviceWrite();
         return result;
     }
 
