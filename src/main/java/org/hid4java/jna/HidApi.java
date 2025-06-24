@@ -42,7 +42,6 @@ import java.util.concurrent.locks.ReentrantLock;
 public class HidApi {
 
     private static final int WSTR_DEFAULT_LEN = 512;
-    private static final int DEVICE_ERROR_CODE = -2;
 
     /**
      * Enables use of the LibUSB implementation of the HID API library when
@@ -71,7 +70,8 @@ public class HidApi {
      */
     public static boolean logTraffic = false;
 
-    private static final Lock HID_API_LOCK = new ReentrantLock();
+    private static final @NotNull Lock
+            HID_API_LOCK = new ReentrantLock();
 
     private static @Nullable HidApiLibrary hidApi;
 
@@ -273,13 +273,12 @@ public class HidApi {
      * @param device The HID device structure.
      * @return The message of the last error that occurred for the device,
      * {@code null} if no errors have occurred.
+     * @throws NullPointerException  If {@code device} is {@code null}.
      * @throws IllegalStateException If the HID API is not initialized.
      */
     public static @Nullable String getLastErrorMessage(
-            @Nullable HidDeviceStructure device) {
-        if (device == null) {
-            return null; /* don't bother with obtaining a lock */
-        }
+            @NotNull HidDeviceStructure device) {
+        Objects.requireNonNull(device, "device cannot be null");
 
         Pointer ptr;
 
@@ -304,14 +303,13 @@ public class HidApi {
      * Returns the manufacturer of an HID device.
      *
      * @param device The HID device structure.
-     * @return The manufacturer of the device.
+     * @return The manufacturer of the device, {@code null} on error.
+     * @throws NullPointerException  If {@code device} is {@code null}.
      * @throws IllegalStateException If the HID API is not initialized.
      */
     public static @Nullable String getManufacturer(
-            @Nullable HidDeviceStructure device) {
-        if (device == null) {
-            return null; /* don't bother with obtaining a lock */
-        }
+            @NotNull HidDeviceStructure device) {
+        Objects.requireNonNull(device, "device cannot be null");
 
         HID_API_LOCK.lock();
         try {
@@ -333,14 +331,13 @@ public class HidApi {
      * Returns the product ID of an HID device.
      *
      * @param device The HID device structure.
-     * @return The product ID of the device.
+     * @return The product ID of the device, {@code null} on error.
+     * @throws NullPointerException  If {@code device} is {@code null}.
      * @throws IllegalStateException If the HID API is not initialized.
      */
     public static @Nullable String getProductId(
-            @Nullable HidDeviceStructure device) {
-        if (device == null) {
-            return null; /* don't bother with obtaining a lock */
-        }
+            @NotNull HidDeviceStructure device) {
+        Objects.requireNonNull(device, "device cannot be null");
 
         HID_API_LOCK.lock();
         try {
@@ -362,14 +359,13 @@ public class HidApi {
      * Returns the serial number of an HID device.
      *
      * @param device The HID device structure.
-     * @return The serial number of the device.
+     * @return The serial number of the device, {@code null} on error.
+     * @throws NullPointerException  If {@code device} is {@code null}.
      * @throws IllegalStateException If the HID API is not initialized.
      */
     public static @Nullable String getSerialNumber(
-            @Nullable HidDeviceStructure device) {
-        if (device == null) {
-            return null; /* don't bother with obtaining a lock */
-        }
+            @NotNull HidDeviceStructure device) {
+        Objects.requireNonNull(device, "device cannot be null");
 
         HID_API_LOCK.lock();
         try {
@@ -402,14 +398,13 @@ public class HidApi {
      * @param nonBlocking {@code true} to enable non-blocking,
      *                    {@code false} to disable non-blocking.
      * @return {@code 0} on success, {@code -1} on error.
+     * @throws NullPointerException If {@code device} is {@code null}.
      */
     @Range(from = -1, to = Integer.MAX_VALUE)
     public static int setNonBlocking(
-            @Nullable HidDeviceStructure device,
+            @NotNull HidDeviceStructure device,
             boolean nonBlocking) {
-        if (device == null) {
-            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
-        }
+        Objects.requireNonNull(device, "device cannot be null");
 
         HID_API_LOCK.lock();
         try {
@@ -433,14 +428,15 @@ public class HidApi {
      * @return The number of bytes read, {@code -1} on error. If there is
      * no data to be read and the handle is in non-blocking mode, {@code 0}
      * is returned immediately.
+     * @throws NullPointerException If {@code device} or {@code buffer}
+     *                              are {@code null}.
      */
     @Range(from = -1, to = Integer.MAX_VALUE)
     public static int read(
-            @Nullable HidDeviceStructure device,
-            byte @Nullable [] buffer) {
-        if (device == null || buffer == null) {
-            return DEVICE_ERROR_CODE;
-        }
+            @NotNull HidDeviceStructure device,
+            byte @NotNull [] buffer) {
+        Objects.requireNonNull(device, "device cannot be null");
+        Objects.requireNonNull(buffer, "buffer cannot be null");
 
         HID_API_LOCK.lock();
         try {
@@ -464,10 +460,10 @@ public class HidApi {
             byte @NotNull [] buffer,
             @Range(from = -1L, to = Integer.MAX_VALUE) int timeoutMs) {
         WideStringBuffer wStr = new WideStringBuffer(buffer);
-        int numBytes = hidApi.hid_read_timeout(device.ptr,
+        int bytesRead = hidApi.hid_read_timeout(device.ptr,
                 wStr, buffer.length, timeoutMs);
         logTraffic(wStr, false);
-        return numBytes;
+        return bytesRead;
     }
 
     /**
@@ -483,15 +479,16 @@ public class HidApi {
      *                  wait indefinitely.
      * @return The number of bytes read, {@code -1} on error. If there is
      * no data to be read within the timeout, {@code 0} is returned.
+     * @throws NullPointerException If {@code device} or {@code buffer}
+     *                              are {@code null}.
      */
     @Range(from = -1, to = Integer.MAX_VALUE)
     public static int read(
-            @Nullable HidDeviceStructure device,
-            byte @Nullable [] buffer,
+            @NotNull HidDeviceStructure device,
+            byte @NotNull [] buffer,
             @Range(from = -1L, to = Long.MAX_VALUE) long timeoutMs) {
-        if (device == null || buffer == null) {
-            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
-        }
+        Objects.requireNonNull(device, "device cannot be null");
+        Objects.requireNonNull(buffer, "buffer cannot be null");
 
         HID_API_LOCK.lock();
         try {
@@ -507,12 +504,12 @@ public class HidApi {
                 int timeoutMsChunk = (int) Math.min(
                         Integer.MAX_VALUE, remainingTimeoutMs);
 
-                int numBytes = read(
+                int bytesRead = read(
                         hidApi, device, buffer, timeoutMsChunk);
-                if (numBytes < 0) {
-                    return numBytes; /* error occurred */
-                } else if (numBytes > 0) {
-                    return numBytes; /* data received */
+                if (bytesRead < 0) {
+                    return bytesRead; /* error occurred */
+                } else if (bytesRead > 0) {
+                    return bytesRead; /* data received */
                 }
 
                 remainingTimeoutMs -= timeoutMsChunk;
@@ -531,26 +528,21 @@ public class HidApi {
      * @param buffer   A buffer to write the data into.
      * @param reportId The ID of the report to read.
      * @return The number of bytes read, {@code -1} on error.
+     * @throws NullPointerException If {@code device} or {@code buffer}
+     *                              are {@code null}.
      */
     @Range(from = -1, to = Integer.MAX_VALUE)
     public static int getFeatureReport(
-            @Nullable HidDeviceStructure device,
-            byte @Nullable [] buffer,
+            @NotNull HidDeviceStructure device,
+            byte @NotNull [] buffer,
             byte reportId) {
-        if (device == null || buffer == null) {
-            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
-        }
+        Objects.requireNonNull(device, "device cannot be null");
+        Objects.requireNonNull(buffer, "buffer cannot be null");
 
         HID_API_LOCK.lock();
         try {
             HidApiLibrary hidApi = requireInit();
 
-            /*
-             * TODO: Should we even use this? It feels like an
-             *  incredible waste of computing time just to have
-             *  a dedicated report ID parameter. It also makes
-             *  off by one errors much easier to occur...
-             */
             WideStringBuffer report = new WideStringBuffer(
                     buffer.length + 1);
             report.buffer[0] = reportId;
@@ -580,26 +572,21 @@ public class HidApi {
      * @param data     The data to send.
      * @param reportId The ID of the report to send.
      * @return The number of bytes written, {@code -1} on error.
+     * @throws NullPointerException If {@code device} or {@code data}
+     *                              are {@code null}.
      */
     @Range(from = -1, to = Integer.MAX_VALUE)
     public static int sendFeatureReport(
-            @Nullable HidDeviceStructure device,
-            byte @Nullable [] data,
+            @NotNull HidDeviceStructure device,
+            byte @NotNull [] data,
             byte reportId) {
-        if (device == null || data == null) {
-            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
-        }
+        Objects.requireNonNull(device, "device cannot be null");
+        Objects.requireNonNull(data, "data cannot be null");
 
         HID_API_LOCK.lock();
         try {
             HidApiLibrary hidApi = requireInit();
 
-            /*
-             * TODO: Should we even use this? It feels like an
-             *  incredible waste of computing time just to have
-             *  a dedicated report ID parameter. It also makes
-             *  off by one errors much easier to occur...
-             */
             WideStringBuffer report = new WideStringBuffer(data.length + 1);
             report.buffer[0] = reportId;
             System.arraycopy(data, 0, report.buffer, 1, data.length);
@@ -626,16 +613,18 @@ public class HidApi {
      * @param reportId The ID of the report to send. For devices that
      *                 only support a single report, use {@code 0x00}.
      * @return The number of bytes written, {@code -1} on error.
+     * @throws NullPointerException If {@code device} or {@code data}
+     *                              are {@code null}.
      */
     @Range(from = -1, to = Integer.MAX_VALUE)
     public static int write(
-            @Nullable HidDeviceStructure device,
-            byte @Nullable [] data,
+            @NotNull HidDeviceStructure device,
+            byte @NotNull [] data,
             @Range(from = 0, to = Integer.MAX_VALUE) int length,
             byte reportId) {
-        if (device == null || data == null) {
-            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
-        } else if (length >= data.length) {
+        Objects.requireNonNull(device, "device cannot be null");
+        Objects.requireNonNull(data, "data cannot be null");
+        if (length >= data.length) {
             String message = "length out of bounds for data";
             throw new IllegalArgumentException(message);
         }
@@ -644,12 +633,6 @@ public class HidApi {
         try {
             HidApiLibrary hidApi = requireInit();
 
-            /*
-             * TODO: Should we even use this? It feels like an
-             *  incredible waste of computing time just to have
-             *  a dedicated report ID parameter. It also makes
-             *  off by one errors much easier to occur...
-             */
             WideStringBuffer report = new WideStringBuffer(length + 1);
             report.buffer[0] = reportId;
             System.arraycopy(data, 0, report.buffer, 1, length);
@@ -674,6 +657,7 @@ public class HidApi {
             @Nullable HidDeviceStructure device,
             @Range(from = 0, to = Integer.MAX_VALUE) int index) {
         if (device == null) {
+            // TODO: error message here?
             return null; /* don't bother with obtaining a lock */
         }
 
@@ -701,15 +685,17 @@ public class HidApi {
      * @param buffer A buffer to write the data into.
      * @param length The buffer length in multiples of {@code wchar_t}.
      * @return {@code 0} on success, {@code -1} on error.
+     * @throws NullPointerException If {@code device} or {@code buffer}
+     *                              are {@code null}.
      */
     @Range(from = -1, to = Integer.MAX_VALUE)
     public static int getReportDescriptor(
-            @Nullable HidDeviceStructure device,
-            byte @Nullable [] buffer,
+            @NotNull HidDeviceStructure device,
+            byte @NotNull [] buffer,
             @Range(from = 0, to = Integer.MAX_VALUE) int length) {
-        if (device == null || buffer == null) {
-            return DEVICE_ERROR_CODE; /* TODO: this contradicts docs */
-        } else if (length >= buffer.length) {
+        Objects.requireNonNull(device, "device cannot be null");
+        Objects.requireNonNull(buffer, "buffer cannot be null");
+        if (length >= buffer.length) {
             String message = "length out of bounds for buffer";
             throw new IllegalArgumentException(message);
         }

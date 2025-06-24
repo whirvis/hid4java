@@ -43,7 +43,6 @@ import java.util.concurrent.locks.ReentrantLock;
  *
  * @since 0.0.1
  */
-@SuppressWarnings("unused")
 public class HidDevice implements Closeable {
 
     private static final int INPUT_REPORT_LENGTH = 64;
@@ -243,16 +242,22 @@ public class HidDevice implements Closeable {
     private void dataRead() {
         dataReadLock.lock();
         try {
-            byte[] data = this.readAll(100);
-            manager.onDeviceDataReceived(this, data);
+            HidReadAllResult result = this.readAll(100);
+            manager.onDeviceDataReceived(this, result.buffer);
         } finally {
             dataReadLock.unlock();
         }
     }
 
-    private void requireOpen() {
-        if (!this.isOpen()) {
-            throw new IllegalStateException("HID device must be open");
+    private @NotNull HidDeviceStructure requireOpen() {
+        deviceLock.lock();
+        try {
+            if (device == null) {
+                throw new IllegalStateException("HID device must be open");
+            }
+            return this.device;
+        } finally {
+            deviceLock.unlock();
         }
     }
 
@@ -318,7 +323,7 @@ public class HidDevice implements Closeable {
     public boolean setNonBlocking(boolean nonBlocking) {
         deviceLock.lock();
         try {
-            this.requireOpen();
+            HidDeviceStructure device = this.requireOpen();
             int result = HidApi.setNonBlocking(device, nonBlocking);
             return result == 0; /* 0 == success, -1 == failure */
         } finally {
@@ -346,7 +351,7 @@ public class HidDevice implements Closeable {
         deviceLock.lock();
         try {
             Objects.requireNonNull(buffer, "buffer cannot be null");
-            this.requireOpen();
+            HidDeviceStructure device = this.requireOpen();
             return HidApi.read(device, buffer);
         } finally {
             deviceLock.unlock();
@@ -376,7 +381,7 @@ public class HidDevice implements Closeable {
         Objects.requireNonNull(buffer, "buffer cannot be null");
         deviceLock.lock();
         try {
-            this.requireOpen();
+            HidDeviceStructure device = this.requireOpen();
             return HidApi.read(device, buffer, timeoutMs);
         } finally {
             deviceLock.unlock();
@@ -403,7 +408,7 @@ public class HidDevice implements Closeable {
             @Range(from = -1L, to = Integer.MAX_VALUE) long timeoutMs) {
         deviceLock.lock();
         try {
-            this.requireOpen();
+            HidDeviceStructure device = this.requireOpen();
             byte[] buffer = new byte[amountToRead];
             int read = HidApi.read(device, buffer, timeoutMs);
             return shorten(buffer, read);
@@ -429,7 +434,7 @@ public class HidDevice implements Closeable {
             @Range(from = 0L, to = Integer.MAX_VALUE) int amountToRead) {
         deviceLock.lock();
         try {
-            this.requireOpen();
+            HidDeviceStructure device = this.requireOpen();
             byte[] buffer = new byte[amountToRead];
             int read = HidApi.read(device, buffer);
             return shorten(buffer, read);
@@ -537,6 +542,7 @@ public class HidDevice implements Closeable {
             packet = data;
         }
 
+        HidDeviceStructure device = this.requireOpen();
         int result = HidApi.write(device, packet, packetLength, reportId);
         manager.onDeviceWrite();
         return result;
@@ -621,7 +627,7 @@ public class HidDevice implements Closeable {
         Objects.requireNonNull(buffer, "buffer cannot be null");
         deviceLock.lock();
         try {
-            this.requireOpen();
+            HidDeviceStructure device = this.requireOpen();
             return HidApi.getFeatureReport(device, buffer, reportId);
         } finally {
             deviceLock.unlock();
@@ -649,7 +655,7 @@ public class HidDevice implements Closeable {
         Objects.requireNonNull(data, "data cannot be null");
         deviceLock.lock();
         try {
-            this.requireOpen();
+            HidDeviceStructure device = this.requireOpen();
             return HidApi.sendFeatureReport(device, data, reportId);
         } finally {
             deviceLock.unlock();
@@ -689,7 +695,7 @@ public class HidDevice implements Closeable {
         Objects.requireNonNull(buffer, "buffer cannot be null");
         deviceLock.lock();
         try {
-            this.requireOpen();
+            HidDeviceStructure device = this.requireOpen();
             int result = HidApi.getReportDescriptor(device, buffer, buffer.length);
             return result == 0; /* 0 == success, -1 == failure */
         } finally {
@@ -706,6 +712,7 @@ public class HidDevice implements Closeable {
     public @Nullable String getLastErrorMessage() {
         deviceLock.lock();
         try {
+            HidDeviceStructure device = this.requireOpen();
             return HidApi.getLastErrorMessage(device);
         } finally {
             deviceLock.unlock();

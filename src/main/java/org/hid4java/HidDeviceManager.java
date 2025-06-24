@@ -26,6 +26,7 @@ package org.hid4java;
 import org.hid4java.jna.HidApi;
 import org.hid4java.jna.HidDeviceInfoStructure;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.concurrent.locks.Lock;
@@ -39,12 +40,12 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 class HidDeviceManager {
 
-    private final HidServicesListenerList listeners;
-    private final HidServicesSpecification specs;
-    private final Map<String, HidDevice> attachedDevices;
-    private final Lock managerLock;
+    private final @NotNull HidServicesListenerList listeners;
+    private final @NotNull HidServicesSpecification specs;
+    private final @NotNull Map<String, HidDevice> attachedDevices;
+    private final @NotNull Lock managerLock;
 
-    private Thread scanThread;
+    private @Nullable Thread scanThread;
 
     HidDeviceManager(
             @NotNull HidServicesListenerList listeners,
@@ -209,6 +210,8 @@ class HidDeviceManager {
              * in order to avoid spurious return values from isScanning().
              * See hid4java issue #125.
              */
+
+            //noinspection DataFlowIssue
             scanThread.interrupt();
             try {
                 scanThread.join(50);

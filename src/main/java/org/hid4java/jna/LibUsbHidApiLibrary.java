@@ -24,6 +24,7 @@
 package org.hid4java.jna;
 
 import com.sun.jna.Native;
+import org.jetbrains.annotations.NotNull;
 
 /**
  * JNA proxy to the LibUSB implementation of the HID API library.
@@ -32,7 +33,7 @@ import com.sun.jna.Native;
  */
 public interface LibUsbHidApiLibrary extends HidRawHidApiLibrary {
 
-    LibUsbHidApiLibrary INSTANCE = Native.load(
+    @NotNull LibUsbHidApiLibrary INSTANCE = Native.load(
             "hidapi-libusb", LibUsbHidApiLibrary.class);
 
 }

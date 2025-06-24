@@ -41,9 +41,9 @@ import java.util.function.BiConsumer;
  */
 public class HidServicesListenerList implements Iterable<HidServicesListener> {
 
-    private final List<HidServicesListener> listeners;
-    private final ReadWriteLock listenersLock;
-    private final ExecutorService executorService;
+    private final @NotNull List<HidServicesListener> listeners;
+    private final @NotNull ReadWriteLock listenersLock;
+    private final @NotNull ExecutorService executorService;
 
     /**
      * Constructs a new {@code HidServicesListenerList}.
@@ -211,7 +211,7 @@ public class HidServicesListenerList implements Iterable<HidServicesListener> {
      * Returns an iterator over the elements in this list.
      * <p>
      * <b>Note:</b> The returned iterator uses a copy of the underlying
-     * listeners list at the time of invocation. A such, odifications to
+     * listeners list at the time of invocation. A such, modifications to
      * the iterator will have no effect.
      *
      * @return an iterator over the elements in this list.

@@ -43,9 +43,9 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class HidServices {
 
-    private final HidServicesListenerList listeners;
-    private final HidDeviceManager manager;
-    private final Lock servicesLock;
+    private final @NotNull HidServicesListenerList listeners;
+    private final @NotNull HidDeviceManager manager;
+    private final @NotNull Lock servicesLock;
 
     /**
      * Constructs a new {@code HidServices}.

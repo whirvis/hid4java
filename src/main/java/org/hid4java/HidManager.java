@@ -24,6 +24,7 @@
 package org.hid4java;
 
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.concurrent.locks.Lock;
@@ -36,9 +37,10 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class HidManager {
 
-    private static final Lock SERVICES_LOCK = new ReentrantLock();
+    private static final @NotNull Lock
+            SERVICES_LOCK = new ReentrantLock();
 
-    private static HidServices hidServices = null;
+    private static @Nullable HidServices hidServices;
 
     /**
      * Returns the HID services.

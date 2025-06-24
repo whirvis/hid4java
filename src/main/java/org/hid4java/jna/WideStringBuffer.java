@@ -37,6 +37,10 @@ import java.util.List;
  */
 public class WideStringBuffer extends Structure implements Structure.ByReference {
 
+    /*
+     * Note: Don't annotate this field with @Nullable,
+     * it produces too many false positives.
+     */
     public byte[] buffer;
 
     /**
